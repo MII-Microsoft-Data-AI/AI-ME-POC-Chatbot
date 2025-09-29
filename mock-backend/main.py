@@ -1,5 +1,8 @@
 """Main FastAPI server with LangGraph integration."""
 import sys
+import os
+import asyncio
+
 sys.dont_write_bytecode = True
 
 # Load environment variables
@@ -55,3 +58,7 @@ app.include_router(
     prefix="/api/v1",
     tags=["file-indexing"]
 )
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))

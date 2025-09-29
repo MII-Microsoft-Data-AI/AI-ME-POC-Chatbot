@@ -3,10 +3,10 @@ from typing import Dict, List, Literal, TypedDict, Annotated
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
-from langgraph.checkpoint.sqlite import SqliteSaver
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.prebuilt import ToolNode
-import aiosqlite
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+from lib.checkpointer import checkpointer
 
 from langchain_core.messages.utils import (
     trim_messages,
@@ -143,33 +143,33 @@ If you cannot find supporting documents: explicitly say "No matching documents f
     # Return the response
     return {"messages": [response]}
 
+async def get_graph():
 
-# Initialize checkpointer
-db = aiosqlite.connect("./mock.db")
-checkpointer = AsyncSqliteSaver(db)
+    # Create the graph
+    workflow = StateGraph(AgentState)
 
-# Create the graph
-workflow = StateGraph(AgentState)
+    # Add nodes
+    workflow.add_node("agent", call_model)
+    workflow.add_node("tools", ToolNode(AVAILABLE_TOOLS))
 
-# Add nodes
-workflow.add_node("agent", call_model)
-workflow.add_node("tools", ToolNode(AVAILABLE_TOOLS))
+    # Set the entrypoint as agent
+    workflow.set_entry_point("agent")
 
-# Set the entrypoint as agent
-workflow.set_entry_point("agent")
+    # Add conditional edges
+    workflow.add_conditional_edges(
+        "agent",
+        should_continue,
+        {
+            "tools": "tools",
+            "end": END,
+        },
+    )
 
-# Add conditional edges
-workflow.add_conditional_edges(
-    "agent",
-    should_continue,
-    {
-        "tools": "tools",
-        "end": END,
-    },
-)
+    # Add edge from tools back to agent
+    workflow.add_edge("tools", "agent")
 
-# Add edge from tools back to agent
-workflow.add_edge("tools", "agent")
+    checkpointer_ins = await checkpointer()
 
-# Compile the graph
-graph = workflow.compile(checkpointer=checkpointer)
+    # Compile the graph
+    graph = workflow.compile(checkpointer=checkpointer_ins)
+    return graph

@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, Depends, Header, HTTPException
 
-from agent.graph import graph
+from agent.graph import get_graph
 from lib.database import db_manager
 
 class ChatRequest(BaseModel):
@@ -43,6 +43,8 @@ async def chat_completions(request: ChatRequest, _: Annotated[str, Depends(get_a
     # Add user and the conversation id to the database
     db_manager.create_conversation(conversation_id, userid)
 
+    graph = await get_graph()
+
     return StreamingResponse(
         generate_stream(graph, input_message, conversation_id),
         media_type="text/event-stream",
@@ -71,13 +73,15 @@ def get_last_conversation_id(_: Annotated[str, Depends(get_authenticated_user)],
     }
 
 @chat_conversation_route.get("/conversations")
-def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None):
+async def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None):
     """Get conversations endpoint."""
     if not userid:
         return {"error": "Missing userid header"}
 
     # Fetch list of conversations for the user from the database
     conversations = db_manager.get_user_conversations(userid)
+
+    graph = await get_graph()
     
     # Convert to the expected API response format
     response = []
@@ -85,7 +89,7 @@ def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], userid
         # Get the first message from the conversation to use as title
         # For now, we'll use a default title since we don't store message content in metadata
         # In a real implementation, you might want to fetch the first message from LangGraph state
-        conv_graph_val = graph.get_state(config={"configurable": {"thread_id": conv.id}}).values
+        conv_graph_val = (await graph.aget_state(config={"configurable": {"thread_id": conv.id}})).values
         conv_graph_messages = conv_graph_val.get("messages", []) if conv_graph_val else []
         title = f"Conversations {conv.id[:8]}..."
 
@@ -108,7 +112,7 @@ def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], userid
     return response
 
 @chat_conversation_route.get("/conversations/{conversation_id}")
-def get_chat_history(_: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None, conversation_id: str = ""):
+async def get_chat_history(_: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None, conversation_id: str = ""):
     """Get chat history for a conversation."""
     if not userid:
         return {"error": "Missing userid header"}
@@ -119,9 +123,10 @@ def get_chat_history(_: Annotated[str, Depends(get_authenticated_user)], userid:
     
     # Fetch chat history for the conversation from LangGraph state
     try:
+        graph = await get_graph()
         # Get the conversation state from the checkpointer
-        states_generator = graph.get_state_history(config={"configurable": {"thread_id": conversation_id}})
-        states = list(states_generator)
+        states_generator = graph.aget_state_history(config={"configurable": {"thread_id": conversation_id}})
+        states = [x async for x in states_generator]
 
         json_dumps = dumps(states)
         
@@ -131,7 +136,7 @@ def get_chat_history(_: Annotated[str, Depends(get_authenticated_user)], userid:
         raise HTTPException(status_code=500, detail=f"Failed to fetch chat history: {str(e)}")
 
 @chat_conversation_route.post("/conversations/{conversation_id}/chat")
-def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None, conversation_id: str = "", request: ChatRequest = None):
+async def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None, conversation_id: str = "", request: ChatRequest = None):
     """Chat in a specific conversation."""
 
     if not userid:
@@ -155,6 +160,8 @@ def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid
         "role": "user",
         "content": last_message_langgraph_content
     }]
+
+    graph = await get_graph()
 
     return StreamingResponse(
         generate_stream(graph, input_message, conversation_id),
