@@ -10,6 +10,7 @@ on:
       - main
     paths: 
       - 'mock-backend/**'
+      - .github/workflows/main_appservice-poc-chatbot-backend.yml
   workflow_dispatch:
 
 jobs:
@@ -44,7 +45,7 @@ jobs:
           name: python-app
           include-hidden-files: true
           path: |
-            .
+            ./mock-backend
             !**/__pycache__/
 
   deploy:
