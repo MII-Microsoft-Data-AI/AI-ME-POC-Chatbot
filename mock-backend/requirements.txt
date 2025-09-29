@@ -63,6 +63,8 @@ frozenlist==1.7.0
     # via
     #   aiohttp
     #   aiosignal
+gunicorn==23.0.0
+    # via mock-backend (pyproject.toml)
 h11==0.16.0
     # via
     #   httpcore
@@ -160,6 +162,7 @@ ormsgpack==1.10.0
     # via langgraph-checkpoint
 packaging==25.0
     # via
+    #   gunicorn
     #   langchain-core
     #   langsmith
     #   marshmallow
