@@ -32,6 +32,8 @@ jobs:
       - name: prepare next standalone output
         run: |
           mkdir -p ./standalone
+          mkdir -p ./standalone/.next
+          mkdir -p ./standalone/.next/static
           cp -r ./.next/standalone/* ./standalone
           cp -r ./.next/static ./standalone/.next/static
           cp -r ./public ./standalone/public
