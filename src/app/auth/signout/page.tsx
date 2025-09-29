@@ -4,14 +4,16 @@ import { signOut } from "next-auth/react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Logo from "@/components/Logo"
-import { getSiteConfig } from "@/lib/site-config"
+import { usePersonalizationContext } from "@/contexts/PersonalizationContext"
+import { getPersonalizedSiteConfig } from "@/lib/personalized-config"
 
 export default function SignOut() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSignedOut, setIsSignedOut] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
-  const siteConfig = getSiteConfig()
+  const { settings } = usePersonalizationContext()
+  const siteConfig = getPersonalizedSiteConfig(settings)
 
   useEffect(() => {
     // Automatically sign out the user when the page loads

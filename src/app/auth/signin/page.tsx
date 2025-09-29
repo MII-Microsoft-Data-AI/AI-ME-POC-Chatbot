@@ -1,5 +1,4 @@
 import SignInClient from "@/components/SignInClient"
-import { getSiteConfig } from "@/lib/site-config"
 import { getSafeCallbackUrl } from "@/lib/callback-utils"
 
 interface SignInPageProps {
@@ -9,12 +8,10 @@ interface SignInPageProps {
 export default async function SignIn({ searchParams }: SignInPageProps) {
   const params = await searchParams
   const next = getSafeCallbackUrl(params.next as string) || "/chat"
-  const siteConfig = getSiteConfig()
 
   return (
     <SignInClient 
       callbackUrl={next}
-      siteConfig={siteConfig}
     />
   )
 }

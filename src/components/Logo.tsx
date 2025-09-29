@@ -1,6 +1,7 @@
 'use client'
 
-import { getSiteConfig } from "@/lib/site-config"
+import { usePersonalizationContext } from "@/contexts/PersonalizationContext"
+import { getPersonalizedSiteConfig } from "@/lib/personalized-config"
 import Image from "next/image"
 
 interface LogoProps {
@@ -12,7 +13,8 @@ interface LogoProps {
 export default function Logo({ 
   className = "", 
 }: LogoProps) {
-  const config = getSiteConfig()
+  const { settings } = usePersonalizationContext()
+  const config = getPersonalizedSiteConfig(settings)
 
   return (
     <div className={`flex items-center justify-center space-x-3 ${className}`}>

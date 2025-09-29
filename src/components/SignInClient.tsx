@@ -4,20 +4,21 @@ import { signIn } from "next-auth/react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Logo from "@/components/Logo"
+import { usePersonalizationContext } from "@/contexts/PersonalizationContext"
+import { getPersonalizedSiteConfig } from "@/lib/personalized-config"
 
 interface SignInClientProps {
   callbackUrl: string
-  siteConfig: {
-    title: string
-  }
 }
 
-export default function SignInClient({ callbackUrl, siteConfig }: SignInClientProps) {
+export default function SignInClient({ callbackUrl }: SignInClientProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const router = useRouter()
+  const { settings } = usePersonalizationContext()
+  const siteConfig = getPersonalizedSiteConfig(settings)
 
   const handleCredentialsSignIn = async (e: React.FormEvent) => {
     e.preventDefault()

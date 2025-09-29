@@ -32,7 +32,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { LazyMotion, MotionConfig, domAnimation } from "motion/react";
 import * as m from "motion/react-m";
-import { getSiteConfig } from "@/lib/site-config";
+
+import { getPersonalizedSiteConfig } from "@/lib/personalized-config";
+import { usePersonalizationContext } from "@/contexts/PersonalizationContext";
 import { getTimeOfDay } from "@/utils/time-utils";
 import { ChatMessageSkeleton } from "@/components/ChatMessageSkeleton";
 
@@ -103,8 +105,8 @@ const ThreadScrollToBottom: FC = () => {
 };
 
 const ThreadWelcome: FC = () => {
-
-  const config = getSiteConfig()
+  const { settings } = usePersonalizationContext()
+  const config = getPersonalizedSiteConfig(settings)
   const time = getTimeOfDay()
 
   return (
@@ -137,8 +139,8 @@ const ThreadWelcome: FC = () => {
 };
 
 const ThreadWelcomeSuggestions: FC = () => {
-
-  const config = getSiteConfig()
+  const { settings } = usePersonalizationContext()
+  const config = getPersonalizedSiteConfig(settings)
 
   return (
     <div className="aui-thread-welcome-suggestions grid w-full gap-2 @md:grid-cols-2">

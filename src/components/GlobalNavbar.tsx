@@ -10,7 +10,9 @@ import MenuButton from "./MenuButton"
 import Logo from "./Logo"
 import ChatSearch from "./ChatSearch"
 import ChatSkeleton from "./ChatSkeleton"
-import { getSiteConfig, getPageTitle } from "@/lib/site-config"
+import { getPageTitle } from "@/lib/site-config"
+import { getPersonalizedSiteConfig } from "@/lib/personalized-config"
+import { usePersonalizationContext } from "@/contexts/PersonalizationContext"
 import { SquarePen, PanelRightClose, PanelRightOpen } from "lucide-react"
 
 interface GlobalNavbarProps {
@@ -139,7 +141,8 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
   const { showConfirmation } = useModal()
   const router = useRouter()
   const pathname = usePathname()
-  const siteConfig = getSiteConfig()
+  const { settings } = usePersonalizationContext()
+  const siteConfig = getPersonalizedSiteConfig(settings)
 
   // Load isPinned state from localStorage on component mount
   useEffect(() => {
