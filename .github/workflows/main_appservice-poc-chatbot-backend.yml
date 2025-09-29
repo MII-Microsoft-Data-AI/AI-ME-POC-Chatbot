@@ -44,7 +44,7 @@ jobs:
           name: python-app
           path: |
             .
-            !venv/
+            !**/__pycache__/
 
   deploy:
     runs-on: ubuntu-latest

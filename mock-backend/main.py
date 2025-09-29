@@ -1,7 +1,6 @@
 """Main FastAPI server with LangGraph integration."""
 import sys
 import os
-import asyncio
 
 sys.dont_write_bytecode = True
 
