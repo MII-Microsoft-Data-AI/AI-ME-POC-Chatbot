@@ -23,11 +23,10 @@ jobs:
         with:
           node-version: '22.x'
 
-      - name: npm install and build
+      - name: bun install
         run: |
-          npm install
-          npm run build
-          npm prune --production
+          bun install
+          bun run build
 
       - name: Prepare artifact for deployment job
         run: |
