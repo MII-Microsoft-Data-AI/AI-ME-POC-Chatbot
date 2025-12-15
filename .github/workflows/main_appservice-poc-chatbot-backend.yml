@@ -63,9 +63,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_CFCD1086EDE14C2983764FE204F5C084 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_3CCEC9CAAB1C430BB4E3B7965DA527D1 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_9E080238A6444894BA011BD3E385F354 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_15F9D47A066D4F43B6D740C8461408A4 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_48A30E3D3D5C45B08584355AFE0FCD31 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_E04EFABA119B433FA1655BEDDEA59E0B }}
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
@@ -73,4 +73,3 @@ jobs:
         with:
           app-name: 'AppService-POC-Chatbot-Backend'
           slot-name: 'Production'
-          
