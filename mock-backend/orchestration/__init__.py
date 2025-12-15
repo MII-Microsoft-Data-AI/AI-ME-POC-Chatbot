@@ -1,5 +1,6 @@
 # Run orchestrator
 
+import os
 from .file_indexing import (
     index_file_v1,
     embed_chunks_v1,
@@ -17,7 +18,7 @@ orchestrator = None
 def get_orchestrator():
     global orchestrator
     if orchestrator is None:
-        orchestrator = Orchestrator(db_path="mock.db")
+        orchestrator = Orchestrator(db_path=os.getenv("DB_PATH_ORCHESTRATOR", "mock.db"))
 
         # Register workflows
         orchestrator.registry.register_workflow("index_file_v1", index_file_v1)

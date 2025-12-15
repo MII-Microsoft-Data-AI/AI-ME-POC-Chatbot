@@ -1,4 +1,5 @@
 """Database models and operations for conversation metadata."""
+import os
 import sqlite3
 import time
 from typing import List, Optional, Dict, Any
@@ -326,4 +327,4 @@ class DatabaseManager:
 
 
 # Global database manager instance
-db_manager = DatabaseManager()
+db_manager = DatabaseManager(os.getenv("DB_PATH_CHATBOT", "mock.db"))
