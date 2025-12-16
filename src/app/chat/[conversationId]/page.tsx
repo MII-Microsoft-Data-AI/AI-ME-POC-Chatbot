@@ -17,10 +17,13 @@ function ConversationContent({
   isLoading: boolean;
 }) {
   const threadRuntime = useThreadRuntime()
+  const [hasSentPendingMessage, setHasSentPendingMessage] = useState(false)
 
   // Check for pending message from new chat redirect
   useEffect(() => {
     if (!threadRuntime) return
+    if (isLoading) return // Wait for history to load first!
+    if (hasSentPendingMessage) return // Only send once
 
     const pendingMessage = sessionStorage.getItem('pendingMessage')
     const pendingMode = sessionStorage.getItem('pendingMode')
@@ -35,15 +38,16 @@ function ConversationContent({
         onModeChange(pendingMode as ChatMode)
       }
 
-      // Wait a bit for runtime to be ready
+      // Wait a bit for runtime to be fully ready after history load
       setTimeout(() => {
         // Set the message in composer
         threadRuntime.composer.setText(pendingMessage)
         // Send it
         threadRuntime.composer.send()
+        setHasSentPendingMessage(true)
       }, 100)
     }
-  }, [threadRuntime, onModeChange])
+  }, [threadRuntime, isLoading, hasSentPendingMessage, onModeChange])
 
   return <Thread isLoading={isLoading} mode={mode} onModeChange={onModeChange} />
 }

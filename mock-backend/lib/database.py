@@ -1,10 +1,9 @@
 """Database models and operations for conversation metadata."""
 import os
-import sqlite3
 import time
-from typing import List, Optional, Dict, Any
-from contextlib import contextmanager
+from typing import List, Optional
 from dataclasses import dataclass
+from lib.db_connection import db_connection
 
 
 @dataclass
@@ -31,96 +30,27 @@ class FileMetadata:
 
 
 class DatabaseManager:
-    """Database manager for conversation metadata."""
+    """Async database manager for conversation metadata."""
     
-    def __init__(self, db_path: str = "mock.db"):
-        self.db_path = db_path
-        # Ensure the directory exists
-        db_dir = os.path.dirname(os.path.abspath(self.db_path))
-        if db_dir and not os.path.exists(db_dir):
-            os.makedirs(db_dir, exist_ok=True)
-        self.init_db()
+    def __init__(self):
+        self.use_postgres = db_connection.use_postgres
     
-    @contextmanager
-    def get_connection(self):
-        """Get database connection with context manager."""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row  # Enable column access by name
-        try:
-            yield conn
-        finally:
-            conn.close()
-    
-    def init_db(self):
-        """Initialize the database with the required schema."""
-        with self.get_connection() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS conversations (
-                    id TEXT PRIMARY KEY,
-                    userid TEXT NOT NULL,
-                    is_pinned BOOLEAN DEFAULT FALSE,
-                    created_at INTEGER NOT NULL
-                )
-            """)
-            
-            # Create files table
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS files (
-                    file_id TEXT PRIMARY KEY,
-                    userid TEXT NOT NULL,
-                    filename TEXT NOT NULL,
-                    blob_name TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'pending',
-                    uploaded_at INTEGER NOT NULL,
-                    indexed_at INTEGER,
-                    error_message TEXT,
-                    workflow_id TEXT
-                )
-            """)
-            
-            # Add workflow_id column if it doesn't exist (for existing databases)
-            try:
-                conn.execute("ALTER TABLE files ADD COLUMN workflow_id TEXT")
-            except sqlite3.OperationalError:
-                # Column already exists
-                pass
-            
-            # Create index for faster queries by userid
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_conversations_userid 
-                ON conversations(userid)
-            """)
-            
-            # Create index for userid and created_at for ordering
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_conversations_userid_created_at 
-                ON conversations(userid, created_at DESC)
-            """)
-            
-            # Create index for files by userid
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_files_userid 
-                ON files(userid)
-            """)
-            
-            # Create index for files by status
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_files_status 
-                ON files(status)
-            """)
-            
-            conn.commit()
-    
-    def create_conversation(self, conversation_id: str, userid: str) -> ConversationMetadata:
+    async def create_conversation(self, conversation_id: str, userid: str) -> ConversationMetadata:
         """Create a new conversation metadata entry."""
         created_at = int(time.time())
         
-        with self.get_connection() as conn:
-            conn.execute("""
-                INSERT INTO conversations (id, userid, is_pinned, created_at)
-                VALUES (?, ?, ?, ?)
-            """, (conversation_id, userid, False, created_at))
-            conn.commit()
+        async with db_connection.get_connection() as conn:
+            if self.use_postgres:
+                await conn.execute("""
+                    INSERT INTO conversations (id, userid, is_pinned, created_at)
+                    VALUES ($1, $2, $3, $4)
+                """, conversation_id, userid, False, created_at)
+            else:
+                await conn.execute("""
+                    INSERT INTO conversations (id, userid, is_pinned, created_at)
+                    VALUES (?, ?, ?, ?)
+                """, (conversation_id, userid, False, created_at))
+                await conn.commit()
         
         return ConversationMetadata(
             id=conversation_id,
@@ -129,87 +59,145 @@ class DatabaseManager:
             created_at=created_at
         )
     
-    def get_conversation(self, conversation_id: str, userid: str) -> Optional[ConversationMetadata]:
+    async def get_conversation(self, conversation_id: str, userid: str) -> Optional[ConversationMetadata]:
         """Get conversation metadata by ID and userid."""
-        with self.get_connection() as conn:
-            row = conn.execute("""
-                SELECT id, userid, is_pinned, created_at 
-                FROM conversations 
-                WHERE id = ? AND userid = ?
-            """, (conversation_id, userid)).fetchone()
+        async with db_connection.get_connection() as conn:
+            if self.use_postgres:
+                row = await conn.fetchrow("""
+                    SELECT id, userid, is_pinned, created_at 
+                    FROM conversations 
+                    WHERE id = $1 AND userid = $2
+                """, conversation_id, userid)
+            else:
+                cursor = await conn.execute("""
+                    SELECT id, userid, is_pinned, created_at 
+                    FROM conversations 
+                    WHERE id = ? AND userid = ?
+                """, (conversation_id, userid))
+                row = await cursor.fetchone()
             
             if row:
                 return ConversationMetadata(
-                    id=row['id'],
-                    userid=row['userid'],
-                    is_pinned=bool(row['is_pinned']),
-                    created_at=row['created_at']
+                    id=row['id'] if self.use_postgres else row[0],
+                    userid=row['userid'] if self.use_postgres else row[1],
+                    is_pinned=bool(row['is_pinned'] if self.use_postgres else row[2]),
+                    created_at=row['created_at'] if self.use_postgres else row[3]
                 )
         return None
     
-    def get_user_conversations(self, userid: str) -> List[ConversationMetadata]:
+    async def get_user_conversations(self, userid: str) -> List[ConversationMetadata]:
         """Get all conversations for a user, ordered by created_at descending."""
-        with self.get_connection() as conn:
-            rows = conn.execute("""
-                SELECT id, userid, is_pinned, created_at 
-                FROM conversations 
-                WHERE userid = ? 
-                ORDER BY created_at DESC
-            """, (userid,)).fetchall()
+        async with db_connection.get_connection() as conn:
+            if self.use_postgres:
+                rows = await conn.fetch("""
+                    SELECT id, userid, is_pinned, created_at 
+                    FROM conversations 
+                    WHERE userid = $1 
+                    ORDER BY created_at DESC
+                """, userid)
+            else:
+                cursor = await conn.execute("""
+                    SELECT id, userid, is_pinned, created_at 
+                    FROM conversations 
+                    WHERE userid = ? 
+                    ORDER BY created_at DESC
+                """, (userid,))
+                rows = await cursor.fetchall()
             
-            return [
-                ConversationMetadata(
-                    id=row['id'],
-                    userid=row['userid'],
-                    is_pinned=bool(row['is_pinned']),
-                    created_at=row['created_at']
-                )
-                for row in rows
-            ]
+            if self.use_postgres:
+                return [
+                    ConversationMetadata(
+                        id=row['id'],
+                        userid=row['userid'],
+                        is_pinned=bool(row['is_pinned']),
+                        created_at=row['created_at']
+                    )
+                    for row in rows
+                ]
+            else:
+                return [
+                    ConversationMetadata(
+                        id=row[0],
+                        userid=row[1],
+                        is_pinned=bool(row[2]),
+                        created_at=row[3]
+                    )
+                    for row in rows
+                ]
     
-    def get_last_conversation_id(self, userid: str) -> Optional[str]:
+    async def get_last_conversation_id(self, userid: str) -> Optional[str]:
         """Get the last conversation ID for a user."""
-        with self.get_connection() as conn:
-            row = conn.execute("""
-                SELECT id 
-                FROM conversations 
-                WHERE userid = ? 
-                ORDER BY created_at DESC 
-                LIMIT 1
-            """, (userid,)).fetchone()
+        async with db_connection.get_connection() as conn:
+            if self.use_postgres:
+                row = await conn.fetchrow("""
+                    SELECT id 
+                    FROM conversations 
+                    WHERE userid = $1 
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                """, userid)
+            else:
+                cursor = await conn.execute("""
+                    SELECT id 
+                    FROM conversations 
+                    WHERE userid = ? 
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                """, (userid,))
+                row = await cursor.fetchone()
             
-            return row['id'] if row else None
+            return row['id'] if (self.use_postgres and row) else (row[0] if row else None)
     
-    def pin_conversation(self, conversation_id: str, userid: str, is_pinned: bool = True) -> bool:
+    async def pin_conversation(self, conversation_id: str, userid: str, is_pinned: bool = True) -> bool:
         """Pin or unpin a conversation."""
-        with self.get_connection() as conn:
-            cursor = conn.execute("""
-                UPDATE conversations 
-                SET is_pinned = ? 
-                WHERE id = ? AND userid = ?
-            """, (is_pinned, conversation_id, userid))
-            conn.commit()
-            
-            return cursor.rowcount > 0
+        async with db_connection.get_connection() as conn:
+            if self.use_postgres:
+                result = await conn.execute("""
+                    UPDATE conversations 
+                    SET is_pinned = $1 
+                    WHERE id = $2 AND userid = $3
+                """, is_pinned, conversation_id, userid)
+                return result != "UPDATE 0"
+            else:
+                cursor = await conn.execute("""
+                    UPDATE conversations 
+                    SET is_pinned = ? 
+                    WHERE id = ? AND userid = ?
+                """, (is_pinned, conversation_id, userid))
+                await conn.commit()
+                return cursor.rowcount > 0
     
-    def delete_conversation(self, conversation_id: str, userid: str) -> bool:
+    async def delete_conversation(self, conversation_id: str, userid: str) -> bool:
         """Delete a conversation."""
-        with self.get_connection() as conn:
-            cursor = conn.execute("""
-                DELETE FROM conversations 
-                WHERE id = ? AND userid = ?
-            """, (conversation_id, userid))
-            conn.commit()
-            
-            return cursor.rowcount > 0
+        async with db_connection.get_connection() as conn:
+            if self.use_postgres:
+                result = await conn.execute("""
+                    DELETE FROM conversations 
+                    WHERE id = $1 AND userid = $2
+                """, conversation_id, userid)
+                return result != "DELETE 0"
+            else:
+                cursor = await conn.execute("""
+                    DELETE FROM conversations 
+                    WHERE id = ? AND userid = ?
+                """, (conversation_id, userid))
+                await conn.commit()
+                return cursor.rowcount > 0
     
-    def conversation_exists(self, conversation_id: str, userid: str) -> bool:
+    async def conversation_exists(self, conversation_id: str, userid: str) -> bool:
         """Check if a conversation exists for a user."""
-        with self.get_connection() as conn:
-            row = conn.execute("""
-                SELECT 1 FROM conversations 
-                WHERE id = ? AND userid = ?
-            """, (conversation_id, userid)).fetchone()
+        async with db_connection.get_connection() as conn:
+            if self.use_postgres:
+                row = await conn.fetchrow("""
+                    SELECT 1 FROM conversations 
+                    WHERE id = $1 AND userid = $2
+                """, conversation_id, userid)
+            else:
+                cursor = await conn.execute("""
+                    SELECT 1 FROM conversations 
+                    WHERE id = ? AND userid = ?
+                """, (conversation_id, userid))
+                row = await cursor.fetchone()
             
             return row is not None
 
@@ -328,7 +316,5 @@ class DatabaseManager:
             """, (file_id,)).fetchone()
             
             return row is not None
-
-
 # Global database manager instance
-db_manager = DatabaseManager(os.getenv("DB_PATH_CHATBOT", "mock.db"))
+db_manager = DatabaseManager()

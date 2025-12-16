@@ -32,13 +32,56 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
+# Add timing middleware for debugging
+import time
+from fastapi import Request
+
+@app.middleware("http")
+async def add_timing_header(request: Request, call_next):
+    """Add timing information to debug slow requests."""
+    start_time = time.time()
+    print(f"⏱️  [{request.method}] {request.url.path} - START")
+    
+    response = await call_next(request)
+    
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    print(f"⏱️  [{request.method}] {request.url.path} - DONE in {process_time:.3f}s")
+    
+    return response
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize expensive resources at startup."""
-    print("🚀 Initializing LangGraph at startup...")
+    print("🚀 Initializing application...")
+    
+    # Initialize database connection pool
+    from lib.db_connection import db_connection
+    if db_connection.use_postgres:
+        print("🐘 Initializing PostgreSQL connection pool...")
+        await db_connection.init_postgres_pool()
+    else:
+        print("📁 Using SQLite database")
+    
+    # Run migrations
+    print("🔄 Running database migrations...")
+    from migrations.migrate import run_migrations
+    await run_migrations()
+    
+    # Initialize LangGraph
+    print("🤖 Initializing LangGraph...")
     from agent.graph import get_graph
     await get_graph()  # This will cache the graph
+    
     print("✅ Server ready")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup resources on shutdown."""
+    from lib.db_connection import db_connection
+    if db_connection.use_postgres:
+        print("🔌 Closing PostgreSQL connection pool...")
+        await db_connection.close_postgres_pool()
 
 @app.get("/")
 async def root(username: Annotated[str, Depends(get_authenticated_user)]):

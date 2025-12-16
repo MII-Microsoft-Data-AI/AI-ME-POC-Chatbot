@@ -91,16 +91,26 @@ class CreateConversationRequest(BaseModel):
     conversationId: str | None = None
 
 @chat_conversation_route.post("/create-conversation")
-def create_new_conversation(request: CreateConversationRequest | None = None, _ = Depends(get_authenticated_user), userid: Annotated[str | None, Header()] = None):
+async def create_new_conversation(request: CreateConversationRequest | None = None, _ = Depends(get_authenticated_user), userid: Annotated[str | None, Header()] = None):
     """Create a new conversation and return its ID."""
+    import time
+    start = time.time()
     
     if not userid:
         return {"error": "Missing userid header"}
     
-    # Use provided ID or generate a new one
-    conversation_id = request.conversationId if request and request.conversationId else generate_uuid()
+    print(f"  🔹 Auth check: {(time.time() - start)*1000:.0f}ms")
     
-    db_manager.create_conversation(conversation_id, userid)
+    # Use provided ID or generate a new one
+    t1 = time.time()
+    conversation_id = request.conversationId if request and request.conversationId else generate_uuid()
+    print(f"  🔹 UUID gen: {(time.time() - t1)*1000:.0f}ms")
+    
+    t2 = time.time()
+    await db_manager.create_conversation(conversation_id, userid)
+    print(f"  🔹 DB create: {(time.time() - t2)*1000:.0f}ms")
+    
+    print(f"  ✅ Total: {(time.time() - start)*1000:.0f}ms")
     
     return {
         "conversationId": conversation_id,
@@ -111,13 +121,13 @@ def create_new_conversation(request: CreateConversationRequest | None = None, _ 
 
 
 @chat_conversation_route.get("/last-conversation-id")
-def get_last_conversation_id(_: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None):
+async def get_last_conversation_id(_: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None):
     """Get last conversation ID endpoint."""
     if not userid:
         return {"error": "Missing userid header"}
     
     # Fetch the last conversation ID for the user from the database
-    last_conversation_id = db_manager.get_last_conversation_id(userid)
+    last_conversation_id = await db_manager.get_last_conversation_id(userid)
 
     return {
         "userId": userid,
@@ -131,7 +141,7 @@ async def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], 
         return {"error": "Missing userid header"}
 
     # Fetch list of conversations for the user from the database
-    conversations = db_manager.get_user_conversations(userid)
+    conversations = await db_manager.get_user_conversations(userid)
 
     graph = await get_graph()
     
@@ -178,7 +188,7 @@ async def get_chat_history(_: Annotated[str, Depends(get_authenticated_user)], u
         return {"error": "Missing userid header"}
     
     # Check if the conversation exists and belongs to the user
-    if not db_manager.conversation_exists(conversation_id, userid):
+    if not await db_manager.conversation_exists(conversation_id, userid):
         raise HTTPException(status_code=404, detail="Conversation not found")
     
     # Fetch chat history for the conversation from LangGraph state
@@ -207,7 +217,7 @@ async def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], 
 
 
     # Check if the conversation exists and belongs to the user
-    if not db_manager.conversation_exists(conversation_id, userid):
+    if not await db_manager.conversation_exists(conversation_id, userid):
         raise HTTPException(status_code=404, detail="Conversation not found")
     
     # Convert the input message 
@@ -266,14 +276,14 @@ async def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], 
             }
         )
 @chat_conversation_route.delete("/conversations/{conversation_id}")
-def delete_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None, conversation_id: str = ""):
+async def delete_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None, conversation_id: str = ""):
     """Delete a conversation."""
 
     if not userid:
         return {"error": "Missing userid header"}
 
     # Delete the conversation from the database
-    deleted = db_manager.delete_conversation(conversation_id, userid)
+    deleted = await db_manager.delete_conversation(conversation_id, userid)
     
     if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -281,18 +291,18 @@ def delete_conversation(_: Annotated[str, Depends(get_authenticated_user)], user
     return {"message": "Conversation deleted successfully"}
 
 @chat_conversation_route.post("/conversations/{conversation_id}/pin")
-def pin_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None, conversation_id: str = ""):
+async def pin_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None, conversation_id: str = ""):
     """Pin or unpin a conversation."""
 
     if not userid:
         return {"error": "Missing userid header"}
     
-    existing_data = db_manager.get_conversation(conversation_id, userid)
+    existing_data = await db_manager.get_conversation(conversation_id, userid)
     if not existing_data:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Pin or unpin the conversation in the database
-    updated = db_manager.pin_conversation(conversation_id, userid, not existing_data.is_pinned)
+    updated = await db_manager.pin_conversation(conversation_id, userid, not existing_data.is_pinned)
     
     if not updated:
         raise HTTPException(status_code=404, detail="Conversation not found")
