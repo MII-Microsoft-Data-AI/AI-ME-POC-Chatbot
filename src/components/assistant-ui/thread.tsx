@@ -77,7 +77,8 @@ export const Thread: FC<ThreadProps> = ({ isLoading = false, isCreating = false,
             }
 
             {isLoading ? (
-              <ChatMessageSkeleton count={2} />
+              // Blank state while loading
+              null
             ) : (
               <ThreadPrimitive.Messages
                 components={{
@@ -328,7 +329,7 @@ const Composer: FC<ComposerProps> = ({ isDisabled = false, isCreating = false, m
           <ComposerAction isDisabled={isDisabled || isEmpty} isCreating={isCreating} mode={mode} onModeChange={onModeChange} />
         </ComposerPrimitive.Root>
         {
-          threadExist &&
+          (threadExist || isDisabled) &&
           <m.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}

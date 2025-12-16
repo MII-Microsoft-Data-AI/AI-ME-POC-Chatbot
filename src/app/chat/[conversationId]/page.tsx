@@ -7,7 +7,15 @@ import { useParams } from 'next/navigation';
 import { ChatWithConversationIDAPIRuntime, LoadConversationHistory } from '@/lib/integration/client/chat-conversation';
 import type { ChatMode } from '@/components/assistant-ui/thread';
 
-function ConversationContent({ mode, onModeChange }: { mode: ChatMode; onModeChange: (mode: ChatMode) => void }) {
+function ConversationContent({ 
+  mode, 
+  onModeChange, 
+  isLoading 
+}: { 
+  mode: ChatMode; 
+  onModeChange: (mode: ChatMode) => void; 
+  isLoading: boolean;
+}) {
   const threadRuntime = useThreadRuntime()
 
   // Check for pending message from new chat redirect
@@ -37,7 +45,7 @@ function ConversationContent({ mode, onModeChange }: { mode: ChatMode; onModeCha
     }
   }, [threadRuntime, onModeChange])
 
-  return <Thread isLoading={false} mode={mode} onModeChange={onModeChange} />
+  return <Thread isLoading={isLoading} mode={mode} onModeChange={onModeChange} />
 }
 
 function ChatPage() {
@@ -66,8 +74,7 @@ function ChatPage() {
     }
   }, [mode, mounted])
 
-  const HistoryAdapter: ThreadHistoryAdapter = {
-
+  const HistoryAdapter = React.useMemo<ThreadHistoryAdapter>(() => ({
     async load() {
       try {
         if (!conversationId) {
@@ -124,7 +131,7 @@ function ChatPage() {
     async append() {
       // The message will be saved automatically by your backend when streaming completes
     },
-  }
+  }), [conversationId])
 
   const runtime = ChatWithConversationIDAPIRuntime(conversationId, HistoryAdapter, mode)
 
@@ -148,7 +155,11 @@ function ChatPage() {
           </div>
         ) : (
           // Show main chat interface
-          <ConversationContent mode={mode} onModeChange={setMode} />
+          <ConversationContent 
+            mode={mode} 
+            onModeChange={setMode} 
+            isLoading={isLoadingHistory}
+          />
         )}
       </div>
     </AssistantRuntimeProvider>
