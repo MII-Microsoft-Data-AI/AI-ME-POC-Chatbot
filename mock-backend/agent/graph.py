@@ -64,7 +64,7 @@ def call_model(state: AgentState, config = None) -> Dict[str, List[BaseMessage]]
 
     system_prompt = """
 # Your Role
-You are a helpful AI assistant. You must reason step by step, use multiple tools when needed, and continue iterating until the user’s request is fully satisfied.  
+You are a helpful AI assistant. You must reason step by step, use multiple tools when needed, and continue iterating until the user's request is fully satisfied.  
 
 # Tool Usage Guidelines
 - **Information Search**:  
@@ -143,9 +143,21 @@ If you cannot find supporting documents: explicitly say "No matching documents f
     # Return the response
     return {"messages": [response]}
 
-async def get_graph():
+# Global cached graph instance
+_graph_instance = None
 
-    # Create the graph
+async def get_graph():
+    """Get or create the cached graph instance.
+    
+    This function implements a singleton pattern to avoid rebuilding
+    the graph on every request, which was causing ~5s latency.
+    """
+    global _graph_instance
+    
+    if _graph_instance is not None:
+        return _graph_instance
+    
+    # Create the graph (only once)
     workflow = StateGraph(AgentState)
 
     # Add nodes
@@ -171,5 +183,8 @@ async def get_graph():
     checkpointer_ins = await checkpointer()
 
     # Compile the graph
-    graph = workflow.compile(checkpointer=checkpointer_ins)
-    return graph
+    _graph_instance = workflow.compile(checkpointer=checkpointer_ins)
+    
+    print("✅ LangGraph initialized and cached")
+    
+    return _graph_instance
