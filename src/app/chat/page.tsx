@@ -30,12 +30,13 @@ function ChatPageContent({ mode, onModeChange }: { mode: ChatMode; onModeChange:
 
         setIsCreating(true)
 
-        // Generate ID client-side for optimistic navigation
+        // Generate ID client-side
         const conversationId = crypto.randomUUID()
 
-        // Create conversation in background (fire and forget)
-        // We use keepalive to ensure request completes even if page unmounts
-        fetch('/api/be/create-conversation', {
+        console.log('Creating conversation:', conversationId)
+
+        // Create conversation and WAIT for it to complete
+        const response = await fetch('/api/be/create-conversation', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -43,22 +44,27 @@ function ChatPageContent({ mode, onModeChange }: { mode: ChatMode; onModeChange:
           body: JSON.stringify({
             conversationId,
           }),
-          keepalive: true
-        }).catch(err => console.error('Background creation failed:', err))
-        
-        console.log('Optimistic navigation to:', conversationId)
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to create conversation')
+        }
+
+        const data = await response.json()
+        console.log('Conversation created successfully:', data.conversationId)
         
         // Store message in sessionStorage to send after redirect
         sessionStorage.setItem('pendingMessage', message)
         sessionStorage.setItem('pendingMode', mode)
         
-        // Redirect to conversation page immediately
+        // Now redirect - conversation is guaranteed to exist
         router.push(`/chat/${conversationId}`)
         
       } catch (error) {
         console.error('Failed to create conversation:', error)
         setIsCreating(false)
-        // Fallback to original send? No, we just stay here.
+        // Show error to user
+        alert('Failed to create conversation. Please try again.')
       }
     }
 

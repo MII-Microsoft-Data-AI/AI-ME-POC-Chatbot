@@ -77,7 +77,27 @@ function ChatPage() {
         setIsLoadingHistory(true)
         setError(null)
 
-        const historyData = await LoadConversationHistory(conversationId);
+        // Retry logic for race conditions (conversation might not be created yet)
+        let retries = 3
+        let delay = 500 // Start with 500ms
+        let historyData = null
+
+        while (retries > 0) {
+          historyData = await LoadConversationHistory(conversationId);
+
+          if (historyData !== null) {
+            // Success!
+            break
+          }
+
+          // Failed, retry after delay
+          retries--
+          if (retries > 0) {
+            console.log(`Retrying conversation load... (${retries} attempts left)`)
+            await new Promise(resolve => setTimeout(resolve, delay))
+            delay *= 2 // Exponential backoff
+          }
+        }
 
         if (historyData === null) {
           setError('Failed to load conversation history')
