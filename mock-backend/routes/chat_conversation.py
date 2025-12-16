@@ -139,20 +139,28 @@ async def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], 
     response = []
     for conv in conversations:
         # Get the first message from the conversation to use as title
-        # For now, we'll use a default title since we don't store message content in metadata
-        # In a real implementation, you might want to fetch the first message from LangGraph state
         conv_graph_val = (await graph.aget_state(config={"configurable": {"thread_id": conv.id}})).values
         conv_graph_messages = conv_graph_val.get("messages", []) if conv_graph_val else []
-        title = f"Conversations {conv.id[:8]}..."
+        title = "New Conversation"  # Default title
 
         if conv_graph_messages:
             first_message = conv_graph_messages[0]
             content = first_message.content
 
-            if isinstance(content, list) and len(content) > 0 and content[0]['type'] == 'text':
-                title = content[0]['text']
-            elif type(content) is str:
-                title = content
+            # Extract text from various content formats
+            if isinstance(content, list) and len(content) > 0:
+                # Handle list format (e.g., [{"type": "text", "text": "..."}])
+                for item in content:
+                    if isinstance(item, dict) and item.get('type') == 'text':
+                        title = item.get('text', '').strip()
+                        break
+            elif isinstance(content, str):
+                # Handle simple string format
+                title = content.strip()
+            
+            # Truncate long titles and add ellipsis
+            if len(title) > 50:
+                title = title[:50] + "..."
 
         response.append({
             "id": conv.id,

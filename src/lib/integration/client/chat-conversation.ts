@@ -142,6 +142,24 @@ export const TogglePinConversation = async (conversationId: string) => {
   return true
 }
 
+export const CreateConversation = async (conversationId: string) => {
+  const response = await fetch(`${BaseAPIPath}/create-conversation`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ conversationId }),
+  });
+  
+  if (!response.ok) {
+    console.error('Failed to create conversation')
+    return null
+  }
+  
+  const data = await response.json()
+  return data.conversationId as string
+}
+
 export const DeleteConversation = async (conversationId: string) => {
   const response = await fetch(`${BaseAPIPath}/conversations/${conversationId}`, {
     method: 'DELETE',
