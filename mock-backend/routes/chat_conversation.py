@@ -87,14 +87,19 @@ async def generate_image_stream(prompt: str, conversation_id: str):
         error_message = f"Failed to generate image: {str(e)}"
         yield f"3:{json.dumps(error_message)}\n"
 
+class CreateConversationRequest(BaseModel):
+    conversationId: str | None = None
+
 @chat_conversation_route.post("/create-conversation")
-def create_new_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None):
+def create_new_conversation(request: CreateConversationRequest | None = None, _ = Depends(get_authenticated_user), userid: Annotated[str | None, Header()] = None):
     """Create a new conversation and return its ID."""
     
     if not userid:
         return {"error": "Missing userid header"}
     
-    conversation_id = generate_uuid()
+    # Use provided ID or generate a new one
+    conversation_id = request.conversationId if request and request.conversationId else generate_uuid()
+    
     db_manager.create_conversation(conversation_id, userid)
     
     return {
@@ -102,74 +107,7 @@ def create_new_conversation(_: Annotated[str, Depends(get_authenticated_user)], 
         "userId": userid
     }
 
-@chat_conversation_route.post("/chat")
-async def chat_completions(request: ChatRequest, _: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None):
-    """Chat completions endpoint."""
-
-    if not userid:
-        return {"error": "Missing userid header"}
-
-    conversation_id = generate_uuid()
-
-    # Convert the input message 
-    if type(request.messages) is not list or len(request.messages) == 0:
-        return {"error": "Invalid messages format"}
-    
-    last_message = request.messages[-1] if request.messages else ""
-    
-    # Add user and the conversation id to the database
-    db_manager.create_conversation(conversation_id, userid)
-    
-    # Route based on mode
-    if request.mode == "image":
-        # Extract text from message content
-        message_content = last_message.get('content', '')
-        if isinstance(message_content, list):
-            # Extract text from content array
-            prompt = ""
-            for item in message_content:
-                if isinstance(item, dict) and item.get('type') == 'text':
-                    prompt = item.get('text', '')
-                    break
-        else:
-            prompt = str(message_content)
-        
-        if not prompt:
-            return {"error": "No prompt provided for image generation"}
-        
-        # Generate image using DALL-E
-        return StreamingResponse(
-            generate_image_stream(prompt, conversation_id),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Content-Type": "text/plain; charset=utf-8",
-                "Connection": "keep-alive",
-                "x-vercel-ai-data-stream": "v1",
-                "x-vercel-ai-ui-message-stream": "v1"
-            }
-        )
-    else:
-        # Normal chat mode - use LangGraph
-        last_message_langgraph_content = from_assistant_ui_contents_to_langgraph_contents(last_message['content'])
-        input_message = [{
-            "role": "user",
-            "content": last_message_langgraph_content
-        }]
-
-        graph = await get_graph()
-
-        return StreamingResponse(
-            generate_stream(graph, input_message, conversation_id),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Content-Type": "text/plain; charset=utf-8",
-                "Connection": "keep-alive",
-                "x-vercel-ai-data-stream": "v1",
-                "x-vercel-ai-ui-message-stream": "v1"
-            }
-        )
+# Legacy /chat endpoint removed - all chats now use /conversations/{conversationId}/chat
 
 
 @chat_conversation_route.get("/last-conversation-id")
