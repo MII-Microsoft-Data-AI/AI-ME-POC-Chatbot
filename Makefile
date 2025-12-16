@@ -14,6 +14,7 @@ help:
 	@echo "Backend commands:"
 	@echo "  make langgraph-setup  - Setup backend server environment"
 	@echo "  make langgraph-install - Install backend dependencies"
+	@echo "  make migrate-sql-db   - Run database migrations manually"
 
 # Development - Start both services
 
@@ -115,3 +116,9 @@ langgraph-install:
 	@echo "📥 Installing backend dependencies..."
 	cd mock-backend && uv sync
 	@echo "✅ Backend dependencies installed"
+
+# Run database migrations
+migrate-sql-db:
+	@echo "🔄 Running database migrations..."
+	@cd mock-backend && uv run python -m migrations.migrate
+	@echo "✅ Migrations complete!"
