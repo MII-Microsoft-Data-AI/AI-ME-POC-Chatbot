@@ -9,73 +9,33 @@ import type { ChatMode } from '@/components/assistant-ui/thread';
 
 function ConversationContent({ mode, onModeChange }: { mode: ChatMode; onModeChange: (mode: ChatMode) => void }) {
   const threadRuntime = useThreadRuntime()
-  const [hasSentPendingMessage, setHasSentPendingMessage] = useState(false)
 
   // Check for pending message from new chat redirect
   useEffect(() => {
-    if (!threadRuntime) {
-      console.log('⏳ Waiting for threadRuntime...')
-      return
-    }
-
-    // Prevent duplicate sends
-    if (hasSentPendingMessage) {
-      console.log('✅ Pending message already sent, skipping')
-      return
-    }
+    if (!threadRuntime) return
 
     const pendingMessage = sessionStorage.getItem('pendingMessage')
     const pendingMode = sessionStorage.getItem('pendingMode')
 
-    if (!pendingMessage) {
-      console.log('ℹ️ No pending message found')
-      return
-    }
+    if (pendingMessage) {
+      // Clear from sessionStorage
+      sessionStorage.removeItem('pendingMessage')
+      sessionStorage.removeItem('pendingMode')
 
-    console.log('📨 Found pending message:', pendingMessage)
-    
-    // Set mode if provided
-    if (pendingMode && (pendingMode === 'chat' || pendingMode === 'image')) {
-      console.log('🎨 Setting mode to:', pendingMode)
-      onModeChange(pendingMode as ChatMode)
-    }
-
-    // Mark as sent BEFORE actually sending to prevent re-render issues
-    setHasSentPendingMessage(true)
-
-    // Wait for runtime to be fully ready - check if we can get thread state
-    const checkAndSend = async () => {
-      try {
-        // Try to get thread state to ensure runtime is ready
-        const state = threadRuntime.getState()
-        console.log('🔍 Thread state:', state)
-
-        // Wait a bit more to ensure everything is initialized
-        await new Promise(resolve => setTimeout(resolve, 300))
-
-        console.log('🚀 Sending pending message...')
-        
-        // Append message directly to thread instead of using composer
-        // This is more reliable for programmatic message sending
-        await threadRuntime.append({
-          role: 'user',
-          content: [{ type: 'text', text: pendingMessage }]
-        })
-        
-        // Clear from sessionStorage AFTER sending
-        sessionStorage.removeItem('pendingMessage')
-        sessionStorage.removeItem('pendingMode')
-        
-        console.log('✅ Pending message sent successfully')
-      } catch (error) {
-        console.error('❌ Failed to send pending message:', error)
-        // Reset flag so user can retry
-        setHasSentPendingMessage(false)
+      // Set mode if provided
+      if (pendingMode && (pendingMode === 'chat' || pendingMode === 'image')) {
+        onModeChange(pendingMode as ChatMode)
       }
-    }
 
-    checkAndSend()
-  }, [threadRuntime, onModeChange, hasSentPendingMessage])
+      // Wait a bit for runtime to be ready
+      setTimeout(() => {
+        // Set the message in composer
+        threadRuntime.composer.setText(pendingMessage)
+        // Send it
+        threadRuntime.composer.send()
+      }, 100)
+    }
+  }, [threadRuntime, onModeChange])
 
   return <Thread isLoading={false} mode={mode} onModeChange={onModeChange} />
 }
