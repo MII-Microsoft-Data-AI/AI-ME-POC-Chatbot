@@ -1,265 +1,500 @@
-# Mock LangGraph Server
+# Mock Backend - AI Chat & Image Generation API
 
-A real-time Azure inference API built with FastAPI, LangGraph, and Azure OpenAI.
+A real-time AI inference API built with FastAPI, LangGraph, and Azure OpenAI, supporting both GPT-4 chat and DALL-E 3 image generation through a unified interface.
 
-## Features
+## 🌟 Features
 
-- **LangGraph Integration**: Uses LangGraph for building conversational AI agents
-- **Azure OpenAI**: Integrates with Azure OpenAI services
-- **Real-time Streaming**: Supports streaming responses for real-time interactions
-- **Tool Support**: Includes a sample tool for getting current time
-- **SQLite Checkpointer**: Persistent conversation state with SQLite
-- **Conversation Metadata**: SQLite database for managing conversation metadata (pinning, creation time, user association)
-- **File Indexing System**: Complete file upload, processing, and vector search using Azure services:
-  - Azure Blob Storage for file storage
-  - Azure Document Intelligence for content extraction
-  - Azure OpenAI for embedding generation
-  - Azure AI Search for vector database
+### Core Features
 
-## Setup
+- **Unified Chat Endpoint** - Single endpoint for both chat and image generation
+- **Mode-Based Routing** - Automatic routing to GPT-4 or DALL-E based on mode
+- **LangGraph Integration** - Conversation state management
+- **Azure OpenAI** - GPT-4 and DALL-E 3 integration
+- **Real-time Streaming** - Live response updates
+- **Persistent Storage** - SQLite for conversation history
+- **Tool Support** - Extensible tool system
+
+### Advanced Features
+
+- **Conversation History** - Full chat and image generation history
+- **Vector Search** - Azure AI Search integration
+- **File Indexing** - Document processing and embedding
+- **Authentication** - HTTP Basic Auth
+- **CORS Support** - Frontend integration ready
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.12+
 - UV package manager
-- Azure OpenAI resource and API key
+- Azure OpenAI API access (GPT-4 and DALL-E 3)
 
 ### Installation
 
-1. Navigate to the project directory:
-```bash
-cd mock-backend
+1. **Navigate to backend directory:**
+
+   ```bash
+   cd mock-backend
+   ```
+
+2. **Install dependencies:**
+
+   ```bash
+   uv sync
+   ```
+
+3. **Configure environment:**
+
+   ```bash
+   cp env.sample .env
+   ```
+
+4. **Edit `.env` with your credentials:**
+
+   ```env
+   # Azure OpenAI - Chat
+   AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+   AZURE_OPENAI_API_KEY=your-api-key
+   AZURE_OPENAI_API_VERSION=2025-01-01-preview
+   AZURE_OPENAI_GPT_DEPLOYMENT_NAME=gpt-4
+   
+   # Azure OpenAI - Image Generation
+   AZURE_OPENAI_DALLE_DEPLOYMENT_NAME=dall-e-3
+   
+   # Authentication
+   BACKEND_AUTH_USERNAME=apiuser
+   BACKEND_AUTH_PASSWORD=securepass123
+   ```
+
+5. **Start the server:**
+
+   ```bash
+   uv run uvicorn main:app --host 0.0.0.0 --port 8000
+   ```
+
+Server will be available at `http://localhost:8000`
+
+## 📖 Unified Chat & Image Generation
+
+### Overview
+
+The backend provides a **single `/chat` endpoint** that intelligently routes requests to either GPT-4 (chat) or DALL-E 3 (image generation) based on the `mode` parameter.
+
+### Request Format
+
+```json
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Your prompt here"
+    }
+  ],
+  "mode": "chat" | "image"
+}
 ```
 
-2. Install dependencies using UV:
-```bash
-uv sync
-```
-
-3. Copy the environment template and configure your Azure OpenAI settings:
-```bash
-cp env.sample .env
-```
-
-4. Edit `.env` with your Azure credentials and authentication settings:
-```
-# Azure OpenAI
-AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
-AZURE_OPENAI_API_KEY=your-api-key-here
-AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
-AZURE_OPENAI_API_VERSION=2024-02-01
-
-# Authentication (matches frontend .env.local)
-BACKEND_AUTH_USERNAME=apiuser
-BACKEND_AUTH_PASSWORD=securepass123
-
-# Azure Services for File Indexing (optional)
-AZURE_STORAGE_CONNECTION_STRING=your-storage-connection-string
-AZURE_STORAGE_CONTAINER_NAME=file-uploads
-AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=your-doc-intelligence-endpoint
-AZURE_DOCUMENT_INTELLIGENCE_API_KEY=your-doc-intelligence-key
-AZURE_SEARCH_ENDPOINT=your-search-endpoint
-AZURE_SEARCH_API_KEY=your-search-key
-AZURE_SEARCH_INDEX_NAME=file-embeddings
-```
-
-5. **(Optional)** Install Azure dependencies for file indexing:
-```bash
-python install_azure_deps.py
-```
-
-6. **(Optional)** Test your Azure configuration:
-```bash
-python test_file_indexing.py
-```
-
-### Running the Server
-
-```bash
-uv run python main.py
-```
-
-Or using uvicorn directly:
-```bash
-uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-The server will be available at `http://localhost:8000`.
-
-## API Endpoints
-
-All endpoints require HTTP Basic Authentication.
-
-### Chat Completions
-- **POST** `/v1/chat/completions`
-- Streaming chat completions with tool support
-- **Authentication**: Required (HTTP Basic Auth)
-
-### File Indexing (Optional)
-- **POST** `/api/v1/files` - Upload and index files
-- **GET** `/api/v1/files` - List user files
-- **GET** `/api/v1/files/{file_id}` - Get file status
-- **DELETE** `/api/v1/files/{file_id}` - Delete file
-- **POST** `/api/v1/files/{file_id}/reindex` - Re-index file
-- **Authentication**: Required (HTTP Basic Auth)
-
-### Health Check
-- **GET** `/health`
-- Returns server health status
-- **Authentication**: Required (HTTP Basic Auth)
-
-### Root
-- **GET** `/`
-- Returns basic server information
-- **Authentication**: Required (HTTP Basic Auth)
-
-## Project Structure
-
-```
-mock-backend/
-├── main.py                       # FastAPI server and routes
-├── database.py                   # Database models and operations
-├── auth.py                       # HTTP Basic Authentication
-├── .env                         # Environment variables
-├── env.sample                   # Environment template
-├── install_azure_deps.py        # Azure dependencies installer
-├── test_file_indexing.py        # Configuration test script
-├── FILE_INDEXING_README.md      # File indexing documentation
-├── agent/
-│   ├── graph.py                 # LangGraph agent implementation
-│   ├── model.py                 # Azure OpenAI model configuration
-│   └── tools.py                 # Available tools for the agent
-├── orchestration/
-│   ├── __init__.py              # Orchestrator initialization
-│   └── file_indexing.py         # File processing workflow
-├── routes/
-│   ├── chat_conversation.py     # Chat endpoints
-│   └── file_indexing.py         # File indexing endpoints
-├── utils/
-│   ├── stream_protocol.py       # Streaming utilities
-│   └── uuid.py                  # UUID utilities
-└── README.md                    # This file
-```
-
-## Tools
-
-### Current Time Tool
-- **Function**: `get_current_time()`
-- **Description**: Returns the current date and time in ISO format
-- **Usage**: The agent can call this tool to provide current time information
-
-## Configuration
-
-The server supports the following environment variables:
-
-- `AZURE_OPENAI_ENDPOINT`: Your Azure OpenAI endpoint URL
-- `AZURE_OPENAI_API_KEY`: Your Azure OpenAI API key
-- `AZURE_OPENAI_DEPLOYMENT_NAME`: Your model deployment name
-- `AZURE_OPENAI_API_VERSION`: Azure OpenAI API version (default: 2024-02-01)
-- `BACKEND_AUTH_USERNAME`: Username for HTTP Basic Auth (default: apiuser)
-- `BACKEND_AUTH_PASSWORD`: Password for HTTP Basic Auth (default: securepass123)
-- `HOST`: Server host (default: 0.0.0.0)
-- `PORT`: Server port (default: 8000)
-
-## Usage Example
+### Routing Logic
 
 ```python
-import requests
-import base64
+@chat_conversation_route.post("/chat")
+async def chat_completions(request: ChatRequest):
+    if request.mode == "image":
+        # Extract prompt from message
+        prompt = extract_text_from_message(last_message)
+        
+        # Generate image using DALL-E
+        return StreamingResponse(
+            generate_image_stream(prompt, conversation_id),
+            media_type="text/event-stream"
+        )
+    else:
+        # Normal chat mode - use LangGraph + GPT-4
+        graph = await get_graph()
+        return StreamingResponse(
+            generate_stream(graph, input_message, conversation_id),
+            media_type="text/event-stream"
+        )
+```
 
-# Prepare Basic Auth credentials
-username = "apiuser"
-password = "securepass123"
-credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+### Response Stream Protocol
 
-response = requests.post(
-    "http://localhost:8000/v1/chat/completions",
-    headers={
-        "Authorization": f"Basic {credentials}",
-        "Content-Type": "application/json"
-    },
-    json={
-        "system": "You are a helpful assistant.",
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": "What time is it?"
-                    }
-                ]
-            }
-        ]
-    },
-    stream=True
+Both modes use the same streaming protocol:
+
+```
+f:{"messageId":"uuid"}           # Start message
+0:"content"                      # Text delta
+d:{"finishReason":"stop"}        # Finish message
+3:"error message"                # Error (if any)
+```
+
+#### Chat Mode Stream Example
+
+```
+f:{"messageId":"123e4567-e89b-12d3-a456-426614174000"}
+0:"Hello! "
+0:"How can "
+0:"I help "
+0:"you today?"
+d:{"finishReason":"stop","usage":{"promptTokens":10,"completionTokens":15}}
+```
+
+#### Image Mode Stream Example
+
+```
+f:{"messageId":"123e4567-e89b-12d3-a456-426614174000"}
+0:"![Generated Image](https://dalle-url.com/image.png)\n\n*Revised prompt: A beautiful sunset...*"
+d:{"finishReason":"stop","usage":{"promptTokens":0,"completionTokens":0}}
+```
+
+## 🎨 DALL-E Integration
+
+### Image Generation Flow
+
+1. **Receive Request** with `mode: "image"`
+2. **Extract Prompt** from message content
+3. **Call DALL-E API** with prompt
+4. **Format Response** as markdown
+5. **Save to LangGraph** for history
+6. **Stream to Client**
+
+### Implementation
+
+```python
+async def generate_image_stream(prompt: str, conversation_id: str):
+    """Generate image using DALL-E and return as stream"""
+    from langchain_core.messages import HumanMessage, AIMessage
+    
+    # Send start message
+    yield f"f:{json.dumps({'messageId': message_id})}\n"
+    
+    # Generate image
+    client = get_dalle_client()
+    result = client.images.generate(
+        model="dall-e-3",
+        prompt=prompt,
+        size="1024x1024",
+        quality="standard",
+        style="vivid",
+        n=1,
+    )
+    
+    image_url = result.data[0].url
+    revised_prompt = result.data[0].revised_prompt
+    
+    # Format as markdown
+    response_text = f"![Generated Image]({image_url})\n\n*Revised prompt: {revised_prompt}*"
+    
+    # Send text delta
+    yield f"0:{json.dumps(response_text)}\n"
+    
+    # Save to LangGraph for history
+    graph = await get_graph()
+    await graph.aupdate_state(
+        config={"configurable": {"thread_id": conversation_id}},
+        values={
+            "messages": [
+                HumanMessage(content=prompt),
+                AIMessage(content=response_text)
+            ]
+        }
+    )
+    
+    # Send finish message
+    yield f"d:{json.dumps({'finishReason': 'stop'})}\n"
+```
+
+### DALL-E Configuration
+
+```python
+def get_dalle_client():
+    """Get Azure OpenAI client for DALL-E"""
+    return AzureOpenAI(
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    )
+```
+
+## 💾 Conversation History
+
+### LangGraph State Management
+
+Both chat and image conversations are saved to LangGraph state:
+
+```python
+# Chat mode - automatic via LangGraph
+async for msg in graph.astream(input_message, config):
+    # Messages automatically saved to checkpointer
+    pass
+
+# Image mode - manual save
+await graph.aupdate_state(
+    config={"configurable": {"thread_id": conversation_id}},
+    values={"messages": [user_message, ai_message]}
 )
-
-for line in response.iter_lines():
-    if line:
-        print(line.decode('utf-8'))
 ```
 
-### Using curl
+### Database Schema
 
-```bash
-# Test authentication
-curl -u apiuser:securepass123 http://localhost:8000/health
-
-# Chat request
-curl -u apiuser:securepass123 \
-  -X POST http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"messages": [{"role": "user", "content": [{"type": "text", "text": "What time is it?"}]}]}'
-```
-
-## Database Schema
-
-The server uses two SQLite databases:
-
-### Conversation Metadata Database (`conversation_metadata.db`)
-Stores conversation metadata for the frontend interface:
+**Conversation Metadata (`conversation_metadata.db`):**
 
 ```sql
 CREATE TABLE conversations (
-    id TEXT PRIMARY KEY,           -- Unique conversation/thread ID
-    userid TEXT NOT NULL,          -- User ID from authentication
-    is_pinned BOOLEAN DEFAULT FALSE, -- Whether conversation is pinned
-    created_at INTEGER NOT NULL    -- Unix timestamp (seconds)
+    id TEXT PRIMARY KEY,
+    userid TEXT NOT NULL,
+    is_pinned BOOLEAN DEFAULT FALSE,
+    created_at INTEGER NOT NULL
 );
 ```
 
-### LangGraph State Database (`mock-langgraph-db.db`)
-Stores conversation history and agent state managed by LangGraph checkpointer.
+**LangGraph State (`mock-langgraph-db.db`):**
 
-## API Endpoints
+- Managed by LangGraph SQLite checkpointer
+- Stores full message history
+- Supports conversation continuation
 
-- `GET /` - Root endpoint (requires auth)
-- `GET /health` - Health check (requires auth)
-- `POST /chat` - Start new conversation
-- `GET /last-conversation-id` - Get user's most recent conversation
-- `GET /conversations` - List all conversations for user
-- `GET /conversations/{id}` - Get conversation history
-- `POST /conversations/{id}/chat` - Continue existing conversation
-- `POST /conversations/{id}/pin` - Pin/unpin conversation
-- `DELETE /conversations/{id}` - Delete conversation
+## 🔧 API Endpoints
 
-All endpoints require HTTP Basic Auth and a `userid` header.
+### Chat & Image Generation
 
-## Development
+**POST `/chat`**
 
-To extend the server with additional tools:
+- Unified endpoint for chat and image generation
+- Requires: `userid` header, Basic Auth
+- Body: `{ messages, mode }`
+- Returns: Streaming response
 
-1. Add new tools in `tools.py`
-2. Update the `AVAILABLE_TOOLS` list
-3. The graph will automatically bind and use the new tools
+### Conversation Management
 
-For custom graph modifications, edit the `graph.py` file to adjust the agent behavior, routing logic, or state management.
+**GET `/conversations`**
 
-### Testing Database Operations
+- List all user conversations
+- Returns: Array of conversation metadata
 
-Run the database test script to verify all operations:
+**GET `/conversations/{id}`**
+
+- Get conversation history
+- Returns: Full message history from LangGraph
+
+**POST `/conversations/{id}/pin`**
+
+- Pin/unpin conversation
+- Body: `{ is_pinned: boolean }`
+
+**DELETE `/conversations/{id}`**
+
+- Delete conversation and history
+
+### Health & Status
+
+**GET `/health`**
+
+- Server health check
+- Returns: `{ status: "healthy" }`
+
+## 🏗️ Project Structure
+
+```
+mock-backend/
+├── main.py                      # FastAPI app
+├── routes/
+│   ├── chat_conversation.py     # Chat & image endpoints
+│   └── file_indexing.py         # File processing
+├── agent/
+│   ├── graph.py                 # LangGraph agent
+│   ├── model.py                 # Azure OpenAI config
+│   └── tools.py                 # Agent tools
+├── utils/
+│   ├── stream_protocol.py       # Streaming utilities
+│   └── uuid.py                  # UUID generation
+├── lib/
+│   └── database.py              # Database operations
+└── .env                         # Configuration
+```
+
+## 🔐 Authentication
+
+All endpoints require:
+
+1. **HTTP Basic Auth**
+
+   ```
+   Authorization: Basic base64(username:password)
+   ```
+
+2. **User ID Header**
+
+   ```
+   userid: user@example.com
+   ```
+
+Example:
 
 ```bash
-python test_database.py
+curl -u apiuser:securepass123 \
+  -H "userid: user@example.com" \
+  -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "Hello"}],
+    "mode": "chat"
+  }'
 ```
+
+## 🛠️ Development
+
+### Adding New Tools
+
+1. **Define tool in `agent/tools.py`:**
+
+   ```python
+   @tool
+   def my_new_tool(param: str) -> str:
+       """Tool description"""
+       return result
+   ```
+
+2. **Add to AVAILABLE_TOOLS:**
+
+   ```python
+   AVAILABLE_TOOLS = [
+       get_current_time,
+       my_new_tool,
+   ]
+   ```
+
+3. **Graph automatically binds tools**
+
+### Testing
+
+**Test Chat Mode:**
+
+```bash
+curl -u apiuser:securepass123 \
+  -H "userid: test@example.com" \
+  -X POST http://localhost:8000/chat \
+  -d '{"messages":[{"role":"user","content":"Hello"}],"mode":"chat"}'
+```
+
+**Test Image Mode:**
+
+```bash
+curl -u apiuser:securepass123 \
+  -H "userid: test@example.com" \
+  -X POST http://localhost:8000/chat \
+  -d '{"messages":[{"role":"user","content":"A sunset"}],"mode":"image"}'
+```
+
+### Database Operations
+
+**Reset database:**
+
+```bash
+rm conversation_metadata.db mock-langgraph-db.db
+```
+
+**View conversations:**
+
+```bash
+sqlite3 conversation_metadata.db "SELECT * FROM conversations;"
+```
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**1. DALL-E API Errors**
+
+- Check `AZURE_OPENAI_DALLE_DEPLOYMENT_NAME` is correct
+- Verify API key has DALL-E access
+- Check API version supports DALL-E 3
+
+**2. Stream Format Errors**
+
+- Ensure text delta is JSON string: `0:"text"`
+- Not JSON object: `0:{"type":"text"}`
+- Check stream protocol implementation
+
+**3. Conversation Not Found**
+
+- Verify messages are saved to LangGraph
+- Check `aupdate_state` is called for image mode
+- Ensure conversation_id matches
+
+**4. Authentication Failures**
+
+- Check credentials match `.env`
+- Verify `userid` header is present
+- Test with curl first
+
+## 📊 Monitoring
+
+### Logs
+
+Server logs show:
+
+- Request routing (chat vs image)
+- DALL-E API calls
+- LangGraph state updates
+- Errors and warnings
+
+Example:
+
+```
+INFO:httpx:HTTP Request: POST https://...openai.azure.com/.../images/generations "HTTP/1.1 200 OK"
+INFO:     ::1:0 - "POST /chat HTTP/1.1" 200 OK
+```
+
+### Health Check
+
+```bash
+curl -u apiuser:securepass123 http://localhost:8000/health
+```
+
+Response:
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-12-16T10:00:00Z"
+}
+```
+
+## 🚀 Deployment
+
+### Docker
+
+```dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+COPY . .
+
+RUN pip install uv
+RUN uv sync
+
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+### Environment Variables
+
+Production `.env`:
+
+```env
+AZURE_OPENAI_ENDPOINT=https://prod-resource.openai.azure.com/
+AZURE_OPENAI_API_KEY=prod-api-key
+AZURE_OPENAI_GPT_DEPLOYMENT_NAME=gpt-4
+AZURE_OPENAI_DALLE_DEPLOYMENT_NAME=dall-e-3
+BACKEND_AUTH_USERNAME=secure-username
+BACKEND_AUTH_PASSWORD=secure-password
+```
+
+## 📝 License
+
+MIT License
+
+---
+
+**Built with ❤️ by the MII Data AI Team**

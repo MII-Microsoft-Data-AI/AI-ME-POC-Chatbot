@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { getNavigationItems } from '@/lib/site-config'
 import NavIcon from './NavIcon'
+import { cn } from '@/lib/utils'
+import { Menu } from 'lucide-react'
 
 interface MenuButtonProps {
   isCollapsed?: boolean
@@ -13,6 +15,7 @@ export default function MenuButton({ isCollapsed = false }: MenuButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
+  const menuRef = useRef<HTMLDivElement>(null)
   
   // Get menu items from site config
   const menuItems = getNavigationItems('menu')
@@ -26,59 +29,57 @@ export default function MenuButton({ isCollapsed = false }: MenuButtonProps) {
     router.push(path)
   }
 
+  // Handle click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   return (
-    <div className="relative">
+    <div className="relative" ref={menuRef}>
       {/* Menu Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full ${isCollapsed ? 'justify-center' : 'justify-start'} flex items-center ${isCollapsed ? 'px-2 py-2' : 'px-4 py-2'} hover:bg-gray-200 rounded-lg transition-colors`}
-        style={{ color: 'var(--foreground)' }}
+        className={cn(
+          "w-full flex items-center transition-colors rounded-md text-[#5f5f5f] hover:text-[#2d2d2d] hover:bg-[#f0f0f0]",
+          isCollapsed ? "justify-center p-2" : "justify-start px-2 py-2 gap-3"
+        )}
         title={isCollapsed ? 'Menu' : ''}
       >
-        {/* Hamburger Icon */}
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M4 6h16M4 12h16M4 18h16"
-          />
-        </svg>
-        {!isCollapsed && <span className="ml-3">Menu</span>}
+        <Menu className="w-5 h-5" strokeWidth={1.5} />
+        {!isCollapsed && <span className="text-sm font-medium">Menu</span>}
       </button>
 
       {/* Popover */}
-      {isOpen && !isCollapsed && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
-          />
-
-          {/* Menu Items */}
-          <div className={`absolute bottom-full left-0 mb-2 ${isCollapsed ? 'w-48' : 'w-full'} rounded-lg shadow-lg border border-gray-300 z-20`} style={{ backgroundColor: 'var(--background)' }}>
-            <div className="py-2">
-              {menuItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => handleMenuClick(item.path)}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-200 transition-colors flex items-center"
-                  style={{ color: 'var(--foreground)' }}
-                  title={item.description}
-                >
-                  <NavIcon iconSvg={item.icon.svg} className="w-4 h-4 mr-3" />
-                  {item.label}
-                </button>
-              ))}
-            </div>
+      {isOpen && (
+        <div 
+           className={cn(
+             "absolute left-0 bottom-full mb-2 rounded-lg shadow-xl border border-[#e5e5e5] bg-white z-50 overflow-hidden",
+             isCollapsed ? "w-48 ml-1" : "w-full"
+           )}
+        >
+          <div className="py-1">
+            {menuItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleMenuClick(item.path)}
+                className="w-full text-left px-3 py-2 hover:bg-[#f9f9f9] transition-colors flex items-center gap-2 group border-b border-[#f3f4f6] last:border-b-0"
+                title={item.description}
+              >
+                <div className="text-[#9ca3af] group-hover:text-[#5f5f5f]">
+                  <NavIcon iconSvg={item.icon.svg} className="w-4 h-4" />
+                </div>
+                <span className="text-sm text-[#2d2d2d] group-hover:text-black">{item.label}</span>
+              </button>
+            ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   )

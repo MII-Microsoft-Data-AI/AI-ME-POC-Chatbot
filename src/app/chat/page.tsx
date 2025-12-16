@@ -1,53 +1,97 @@
 'use client'
 
-import React, {useState, useEffect} from 'react'
-import { Thread } from "@/components/assistant-ui/thread";
-import { AssistantRuntimeProvider, useAssistantState } from '@assistant-ui/react';
-import { useRouter } from 'next/navigation';
-import { FirstChatAPIRuntime, GetLastConversationId } from '@/lib/integration/client/chat-conversation';
+import React, { useState, useEffect, useCallback } from 'react'
+import { Thread } from '@/components/assistant-ui/thread'
+import { AssistantRuntimeProvider, useThreadRuntime } from '@assistant-ui/react'
+import { FirstChatAPIRuntime } from '@/lib/integration/client/chat-conversation'
+import type { ChatMode } from '@/components/assistant-ui/thread'
+import { useRouter } from 'next/navigation'
 
-function RedirectWhenDone() {
+function ChatPageContent({ mode, onModeChange }: { mode: ChatMode; onModeChange: (mode: ChatMode) => void }) {
   const router = useRouter()
-  const [FirstRunning, setFirstRunning] = useState(false)
-  const isRunning = useAssistantState(({ thread }) => thread.isRunning); // boolean
+  const threadRuntime = useThreadRuntime()
 
-
-  async function getLastConversationIdAndRedirect() {
-    // Fetch the last conversation and get its ID
-    const conversationID = await GetLastConversationId()
-    if (conversationID) {
-      router.push('/chat/' + conversationID);
-    } else {
-      console.error('No conversation ID found, cannot redirect.');
-    }
-  }
-
-  // Handle the redirection when the chat is done
+  // Override composer send to create conversation first
   useEffect(() => {
-    if (isRunning) {
-      setFirstRunning(true)
+    if (!threadRuntime) return
+
+    // Store original send function
+    const originalSend = threadRuntime.composer.send
+
+    // Override send function
+    threadRuntime.composer.send = async () => {
+      try {
+        // Get the message from composer
+        const composerState = threadRuntime.composer.getState()
+        const message = composerState.text
+
+        if (!message.trim()) return
+
+        // Create conversation first
+        const response = await fetch('/api/be/create-conversation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        
+        const data = await response.json()
+        
+        if (data.conversationId) {
+          console.log('Created conversation:', data.conversationId)
+          
+          // Store message in sessionStorage to send after redirect
+          sessionStorage.setItem('pendingMessage', message)
+          sessionStorage.setItem('pendingMode', mode)
+          
+          // Redirect to conversation page
+          router.push(`/chat/${data.conversationId}`)
+        }
+      } catch (error) {
+        console.error('Failed to create conversation:', error)
+        // Fallback to original send
+        originalSend()
+      }
     }
 
-    if (!isRunning && FirstRunning) {
-      getLastConversationIdAndRedirect()
+    return () => {
+      // Restore original send on cleanup
+      threadRuntime.composer.send = originalSend
     }
-  }, [isRunning])
-  
-  return <></>
+  }, [threadRuntime, router, mode])
+
+  return <Thread mode={mode} onModeChange={onModeChange} />
 }
 
-
 function ChatPage() {
+  const [mounted, setMounted] = useState(false)
+  const [mode, setMode] = useState<ChatMode>('chat')
 
-  const runtime = FirstChatAPIRuntime()
+  // Load mode from localStorage after mount
+  useEffect(() => {
+    setMounted(true)
+    const saved = localStorage.getItem('chat-mode')
+    if (saved === 'image') {
+      setMode('image')
+    }
+  }, [])
+
+  // Save mode to localStorage when it changes
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem('chat-mode', mode)
+    }
+  }, [mode, mounted])
+
+  // Create runtime with mode - runtime hook must be called at top level
+  const runtime = FirstChatAPIRuntime(mode)
 
   return (
-    <AssistantRuntimeProvider runtime={runtime}>
-      <RedirectWhenDone />
-      <div className='h-screen pt-16 md:pt-0'>
-        <Thread />
-      </div>
-    </AssistantRuntimeProvider>
+    <div className='h-screen pt-16 md:pt-0'>
+      <AssistantRuntimeProvider runtime={runtime}>
+        <ChatPageContent mode={mode} onModeChange={setMode} />
+      </AssistantRuntimeProvider>
+    </div>
   )
 }
 

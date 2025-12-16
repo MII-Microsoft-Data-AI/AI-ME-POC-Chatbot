@@ -12,6 +12,7 @@ export interface SiteConfig {
     width?: number
     height?: number
   }
+  primaryColor?: string
   social: {
     twitter?: string
     github?: string
@@ -198,6 +199,11 @@ export function getPageTitle(pathname: string): string {
   
   if (pathname.startsWith('/chat/')) {
     return 'Chat'
+  }
+  
+  // Handle image generation page
+  if (pathname === '/image-generation') {
+    return 'Image Generation'
   }
   
   // Find matching navigation item

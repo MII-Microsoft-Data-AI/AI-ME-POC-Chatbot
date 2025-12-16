@@ -4,6 +4,7 @@ import { CompositeAttachmentAdapter, SimpleImageAttachmentAdapter, ThreadHistory
 import { formatRelativeTime } from "@/utils/date-utils";
 import { loadFromLanggraphStateHistoryJSON } from "@/utils/langgraph/to-assistant-ui";
 import { useCustomDataStreamRuntime } from "@/utils/custom-data-stream-runtime";
+import type { ChatMode } from "@/components/assistant-ui/thread";
 
 const BaseAPIPath = "/api/be"
 
@@ -14,8 +15,9 @@ const CompositeAttachmentsAdapter = new CompositeAttachmentAdapter([
 ])
 
 // First Chat API Runtime (without conversation ID parameters)
-export const FirstChatAPIRuntime = () => useCustomDataStreamRuntime({
+export const FirstChatAPIRuntime = (mode: ChatMode = 'chat') => useCustomDataStreamRuntime({
   api: `${BaseAPIPath}/chat`,
+  body: { mode }, // Pass mode to backend
   adapters: {
     attachments: CompositeAttachmentsAdapter,
   }
@@ -45,8 +47,9 @@ export async function GetLastConversationId(): Promise<string | null> {
 // You need to provide the conversationId and historyAdapter
 // The conversationId is obtained from the URL parameters
 // The historyAdapter is used to load and append messages to the thread
-export const ChatWithConversationIDAPIRuntime = (conversationId: string, historyAdapter: ThreadHistoryAdapter) => useCustomDataStreamRuntime({
+export const ChatWithConversationIDAPIRuntime = (conversationId: string, historyAdapter: ThreadHistoryAdapter, mode: ChatMode = 'chat') => useCustomDataStreamRuntime({
   api: `${BaseAPIPath}/conversations/${conversationId}/chat`,
+  body: { mode }, // Pass mode to backend
   adapters: {
     history: historyAdapter,
     attachments: CompositeAttachmentsAdapter,
