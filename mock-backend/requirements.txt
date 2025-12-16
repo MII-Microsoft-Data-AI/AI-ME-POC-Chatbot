@@ -17,6 +17,8 @@ anyio==4.11.0
     #   httpx
     #   openai
     #   starlette
+asyncpg==0.31.0
+    # via mock-backend (pyproject.toml)
 attrs==25.3.0
     # via aiohttp
 azure-ai-documentintelligence==1.0.2
