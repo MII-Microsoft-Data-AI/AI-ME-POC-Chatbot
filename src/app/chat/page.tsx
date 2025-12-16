@@ -35,9 +35,14 @@ function ChatPageContent({ mode, onModeChange }: { mode: ChatMode; onModeChange:
         const conversationId = crypto.randomUUID()
 
         console.log('Creating conversation:', conversationId)
-
-        // Create conversation and WAIT for it to complete
-        const createdId = await CreateConversation(conversationId)
+        
+        // Create conversation with 30s timeout
+        const createPromise = CreateConversation(conversationId)
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Conversation creation timeout (30s)')), 30000)
+        )
+        
+        const createdId = await Promise.race([createPromise, timeoutPromise]) as string | null
 
         if (!createdId) {
           throw new Error('Failed to create conversation')
@@ -49,15 +54,15 @@ function ChatPageContent({ mode, onModeChange }: { mode: ChatMode; onModeChange:
         sessionStorage.setItem('pendingMessage', message)
         sessionStorage.setItem('pendingMode', mode)
         
-        // Now redirect to the conversation page
-        // The conversation exists, so no race condition
+        // Now redirect - conversation is guaranteed to exist
         router.push(`/chat/${createdId}`)
         
       } catch (error) {
         console.error('Failed to create conversation:', error)
         setIsCreating(false)
         // Show error to user
-        alert('Failed to create conversation. Please try again.')
+        const errorMessage = error instanceof Error ? error.message : 'Failed to create conversation'
+        alert(`${errorMessage}. Please try again.`)
       }
     }
 
