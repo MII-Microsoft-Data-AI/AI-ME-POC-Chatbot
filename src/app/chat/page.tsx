@@ -6,6 +6,7 @@ import { AssistantRuntimeProvider, useThreadRuntime } from '@assistant-ui/react'
 import type { ChatMode } from '@/components/assistant-ui/thread'
 import { useRouter } from 'next/navigation'
 import { useLocalRuntime } from '@assistant-ui/react'
+import { CreateConversation } from '@/lib/integration/client/chat-conversation'
 
 function ChatPageContent({ mode, onModeChange }: { mode: ChatMode; onModeChange: (mode: ChatMode) => void }) {
   const router = useRouter()
@@ -36,29 +37,21 @@ function ChatPageContent({ mode, onModeChange }: { mode: ChatMode; onModeChange:
         console.log('Creating conversation:', conversationId)
 
         // Create conversation and WAIT for it to complete
-        const response = await fetch('/api/be/create-conversation', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            conversationId,
-          }),
-        })
+        const createdId = await CreateConversation(conversationId)
 
-        if (!response.ok) {
+        if (!createdId) {
           throw new Error('Failed to create conversation')
         }
 
-        const data = await response.json()
-        console.log('Conversation created successfully:', data.conversationId)
+        console.log('Conversation created successfully:', createdId)
         
         // Store message in sessionStorage to send after redirect
         sessionStorage.setItem('pendingMessage', message)
         sessionStorage.setItem('pendingMode', mode)
         
-        // Now redirect - conversation is guaranteed to exist
-        router.push(`/chat/${conversationId}`)
+        // Now redirect to the conversation page
+        // The conversation exists, so no race condition
+        router.push(`/chat/${createdId}`)
         
       } catch (error) {
         console.error('Failed to create conversation:', error)
