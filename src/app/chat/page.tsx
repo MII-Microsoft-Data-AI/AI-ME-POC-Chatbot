@@ -51,11 +51,12 @@ function ChatPageContent({ mode, onModeChange }: { mode: ChatMode; onModeChange:
         }
 
         const data = await response.json()
-        console.log('Conversation created successfully:', data.conversationId)
+        console.log('✅ Conversation created successfully:', data.conversationId)
         
         // Store message in sessionStorage to send after redirect
         sessionStorage.setItem('pendingMessage', message)
         sessionStorage.setItem('pendingMode', mode)
+        console.log('💾 Saved to sessionStorage:', { message, mode })
         
         // Now redirect - conversation is guaranteed to exist
         router.push(`/chat/${conversationId}`)
