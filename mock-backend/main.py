@@ -32,6 +32,14 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Initialize expensive resources at startup."""
+    print("🚀 Initializing LangGraph at startup...")
+    from agent.graph import get_graph
+    await get_graph()  # This will cache the graph
+    print("✅ Server ready")
+
 @app.get("/")
 async def root(username: Annotated[str, Depends(get_authenticated_user)]):
     """Root endpoint."""
