@@ -18,6 +18,7 @@ import {
   PencilIcon,
   RefreshCwIcon,
   Square,
+  Loader2,
 } from "lucide-react";
 import type { FC } from "react";
 import { useState } from "react";
@@ -51,11 +52,12 @@ export type ChatMode = 'chat' | 'image'
 
 interface ThreadProps {
   isLoading?: boolean;
+  isCreating?: boolean;
   mode?: ChatMode;
   onModeChange?: (mode: ChatMode) => void;
 }
 
-export const Thread: FC<ThreadProps> = ({ isLoading = false, mode = 'chat', onModeChange }) => {
+export const Thread: FC<ThreadProps> = ({ isLoading = false, isCreating = false, mode = 'chat', onModeChange }) => {
 
 
 
@@ -89,7 +91,7 @@ export const Thread: FC<ThreadProps> = ({ isLoading = false, mode = 'chat', onMo
             <ThreadPrimitive.If empty={isLoading}>
               <div className="aui-thread-viewport-spacer min-h-8 grow" />
             </ThreadPrimitive.If>
-            <Composer isDisabled={isLoading} mode={mode} onModeChange={onModeChange} />
+            <Composer isDisabled={isLoading} isCreating={isCreating} mode={mode} onModeChange={onModeChange} />
           </ThreadPrimitive.Viewport>
         </ThreadPrimitive.Root>
       </MotionConfig>
@@ -280,11 +282,12 @@ const ThreadWelcomeSuggestions: FC = () => {
 
 interface ComposerProps {
   isDisabled?: boolean;
+  isCreating?: boolean;
   mode?: ChatMode;
   onModeChange?: (mode: ChatMode) => void;
 }
 
-const Composer: FC<ComposerProps> = ({ isDisabled = false, mode = 'chat', onModeChange }) => {
+const Composer: FC<ComposerProps> = ({ isDisabled = false, isCreating = false, mode = 'chat', onModeChange }) => {
 
   const threadExist = useAssistantState(({thread}) => thread.messages.length > 0)
   const text = useAssistantState(({composer}) => composer.text)
@@ -320,9 +323,9 @@ const Composer: FC<ComposerProps> = ({ isDisabled = false, mode = 'chat', onMode
             rows={1}
             autoFocus={!isDisabled}
             aria-label="Message input"
-            disabled={isDisabled}
+            disabled={isDisabled || isCreating}
             />
-          <ComposerAction isDisabled={isDisabled || isEmpty} mode={mode} onModeChange={onModeChange} />
+          <ComposerAction isDisabled={isDisabled || isEmpty} isCreating={isCreating} mode={mode} onModeChange={onModeChange} />
         </ComposerPrimitive.Root>
         {
           threadExist &&
@@ -342,11 +345,12 @@ const Composer: FC<ComposerProps> = ({ isDisabled = false, mode = 'chat', onMode
 
 interface ComposerActionProps {
   isDisabled?: boolean;
+  isCreating?: boolean;
   mode?: ChatMode;
   onModeChange?: (mode: ChatMode) => void;
 }
 
-const ComposerAction: FC<ComposerActionProps> = ({ isDisabled = false, mode = 'chat', onModeChange }) => {
+const ComposerAction: FC<ComposerActionProps> = ({ isDisabled = false, isCreating = false, mode = 'chat', onModeChange }) => {
   const { settings } = usePersonalizationContext()
 
   return (
@@ -373,9 +377,13 @@ const ComposerAction: FC<ComposerActionProps> = ({ isDisabled = false, mode = 'c
             size="icon"
             className="aui-composer-send size-[34px] rounded-full p-1"
             aria-label="Send message"
-            disabled={isDisabled}
+            disabled={isDisabled || isCreating}
           >
-            <ArrowUpIcon className="aui-composer-send-icon size-5" />
+            {isCreating ? (
+              <Loader2 className="aui-composer-send-icon size-5 animate-spin" />
+            ) : (
+              <ArrowUpIcon className="aui-composer-send-icon size-5" />
+            )}
           </TooltipIconButton>
         </ComposerPrimitive.Send>
       </ThreadPrimitive.If>
