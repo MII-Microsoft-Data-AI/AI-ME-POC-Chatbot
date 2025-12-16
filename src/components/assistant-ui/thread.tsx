@@ -13,12 +13,14 @@ import {
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
   CopyIcon,
   PencilIcon,
   RefreshCwIcon,
   Square,
 } from "lucide-react";
 import type { FC } from "react";
+import { useState } from "react";
 
 import {
   ComposerAddAttachment,
@@ -37,6 +39,7 @@ import { getPersonalizedSiteConfig } from "@/lib/personalized-config";
 import { usePersonalizationContext } from "@/contexts/PersonalizationContext";
 import { getTimeOfDay } from "@/utils/time-utils";
 import { ChatMessageSkeleton } from "@/components/ChatMessageSkeleton";
+import { ModeSelector } from "@/components/ModeSelector";
 
 const Settings = {
   attachments: true,
@@ -44,11 +47,15 @@ const Settings = {
   regenerate: false, // Currently we dont support regenerating assistant messages
 }
 
+export type ChatMode = 'chat' | 'image'
+
 interface ThreadProps {
   isLoading?: boolean;
+  mode?: ChatMode;
+  onModeChange?: (mode: ChatMode) => void;
 }
 
-export const Thread: FC<ThreadProps> = ({ isLoading = false }) => {
+export const Thread: FC<ThreadProps> = ({ isLoading = false, mode = 'chat', onModeChange }) => {
 
 
 
@@ -64,7 +71,7 @@ export const Thread: FC<ThreadProps> = ({ isLoading = false }) => {
           <ThreadPrimitive.Viewport className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4">
             {
               !isLoading &&
-            <ThreadWelcome />
+            <ThreadWelcome mode={mode} onModeChange={onModeChange} />
             }
 
             {isLoading ? (
@@ -82,7 +89,7 @@ export const Thread: FC<ThreadProps> = ({ isLoading = false }) => {
             <ThreadPrimitive.If empty={isLoading}>
               <div className="aui-thread-viewport-spacer min-h-8 grow" />
             </ThreadPrimitive.If>
-            <Composer isDisabled={isLoading} />
+            <Composer isDisabled={isLoading} mode={mode} onModeChange={onModeChange} />
           </ThreadPrimitive.Viewport>
         </ThreadPrimitive.Root>
       </MotionConfig>
@@ -104,7 +111,7 @@ const ThreadScrollToBottom: FC = () => {
   );
 };
 
-const ThreadWelcome: FC = () => {
+const ThreadWelcome: FC<{ mode?: ChatMode; onModeChange?: (mode: ChatMode) => void }> = ({ mode = 'chat', onModeChange }) => {
   const { settings } = usePersonalizationContext()
   const config = getPersonalizedSiteConfig(settings)
   const time = getTimeOfDay()
@@ -131,6 +138,50 @@ const ThreadWelcome: FC = () => {
             >
               {config.chat.welcomeMessage}
             </m.div>
+            
+            {/* Mode Selection Cards */}
+            {onModeChange && (
+              <m.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                transition={{ delay: 0.2 }}
+                className="mt-8 w-full max-w-md"
+              >
+                <p className="text-sm text-muted-foreground mb-3">What would you like to do?</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Chat Mode Card */}
+                  <button
+                    onClick={() => onModeChange('chat')}
+                    className={cn(
+                      "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
+                      mode === 'chat' 
+                        ? "border-primary bg-primary/5" 
+                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    )}
+                  >
+                    <span className="text-2xl">💬</span>
+                    <span className="text-sm font-medium">Chat</span>
+                    <span className="text-xs text-muted-foreground text-center">Have a conversation</span>
+                  </button>
+                  
+                  {/* Image Generation Mode Card */}
+                  <button
+                    onClick={() => onModeChange('image')}
+                    className={cn(
+                      "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
+                      mode === 'image' 
+                        ? "border-primary bg-primary/5" 
+                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    )}
+                  >
+                    <span className="text-2xl">✨</span>
+                    <span className="text-sm font-medium">Image Generation</span>
+                    <span className="text-xs text-muted-foreground text-center">Create images</span>
+                  </button>
+                </div>
+              </m.div>
+            )}
           </div>
         </div>
       </div>
@@ -229,13 +280,24 @@ const ThreadWelcomeSuggestions: FC = () => {
 
 interface ComposerProps {
   isDisabled?: boolean;
+  mode?: ChatMode;
+  onModeChange?: (mode: ChatMode) => void;
 }
 
-const Composer: FC<ComposerProps> = ({ isDisabled = false }) => {
+const Composer: FC<ComposerProps> = ({ isDisabled = false, mode = 'chat', onModeChange }) => {
 
   const threadExist = useAssistantState(({thread}) => thread.messages.length > 0)
   const text = useAssistantState(({composer}) => composer.text)
   const isEmpty = text.trim().length < 1
+  const { settings } = usePersonalizationContext()
+  const [showModeMenu, setShowModeMenu] = useState(false)
+
+  const modeOptions = [
+    { value: 'chat' as ChatMode, label: 'Chat', icon: '💬' },
+    { value: 'image' as ChatMode, label: 'Image Generation', icon: '✨' }
+  ]
+
+  const currentMode = modeOptions.find(opt => opt.value === mode) || modeOptions[0]
 
   return (
     <div className="aui-composer-wrapper sticky bottom-0 mx-auto flex w-full max-w-[var(--thread-max-width)] flex-col gap-4 overflow-visible rounded-t-3xl bg-background pb-2 md:pb-4">
@@ -253,14 +315,14 @@ const Composer: FC<ComposerProps> = ({ isDisabled = false }) => {
         )}>
           <ComposerAttachments />
           <ComposerPrimitive.Input
-            placeholder={isDisabled ? "Loading conversation..." : "Send a message..."}
+            placeholder={isDisabled ? "Loading conversation..." : mode === 'image' ? "Describe the image you want to create..." : "Send a message..."}
             className="aui-composer-input mb-1 max-h-32 min-h-16 w-full resize-none bg-transparent px-3.5 pt-1.5 pb-3 text-base outline-none placeholder:text-muted-foreground focus:outline-primary"
             rows={1}
             autoFocus={!isDisabled}
             aria-label="Message input"
             disabled={isDisabled}
             />
-          <ComposerAction isDisabled={isDisabled || isEmpty} />
+          <ComposerAction isDisabled={isDisabled || isEmpty} mode={mode} onModeChange={onModeChange} />
         </ComposerPrimitive.Root>
         {
           threadExist &&
@@ -280,15 +342,26 @@ const Composer: FC<ComposerProps> = ({ isDisabled = false }) => {
 
 interface ComposerActionProps {
   isDisabled?: boolean;
+  mode?: ChatMode;
+  onModeChange?: (mode: ChatMode) => void;
 }
 
-const ComposerAction: FC<ComposerActionProps> = ({ isDisabled = false }) => {
+const ComposerAction: FC<ComposerActionProps> = ({ isDisabled = false, mode = 'chat', onModeChange }) => {
+  const { settings } = usePersonalizationContext()
+
   return (
     <div className="aui-composer-action-wrapper relative mx-1 mt-2 mb-2 flex items-center justify-between">
-      {
-        Settings.attachments &&
-        <ComposerAddAttachment />
-      }
+      <div className="flex items-center gap-2">
+        {
+          Settings.attachments &&
+          <ComposerAddAttachment />
+        }
+        
+        {/* Mode Selector Dropdown */}
+        {onModeChange && (
+          <ModeSelector mode={mode} onModeChange={onModeChange} primaryColor={settings.primaryColor} />
+        )}
+      </div>
 
       <ThreadPrimitive.If running={false}>
         <ComposerPrimitive.Send asChild>

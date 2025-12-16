@@ -1,16 +1,70 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Thread } from "@/components/assistant-ui/thread";
-import { AssistantRuntimeProvider, ThreadHistoryAdapter } from '@assistant-ui/react';
+import { AssistantRuntimeProvider, ThreadHistoryAdapter, useThreadRuntime } from '@assistant-ui/react';
 import { useParams } from 'next/navigation';
 import { ChatWithConversationIDAPIRuntime, LoadConversationHistory } from '@/lib/integration/client/chat-conversation';
+import type { ChatMode } from '@/components/assistant-ui/thread';
+
+function ConversationContent({ mode, onModeChange }: { mode: ChatMode; onModeChange: (mode: ChatMode) => void }) {
+  const threadRuntime = useThreadRuntime()
+
+  // Check for pending message from new chat redirect
+  useEffect(() => {
+    if (!threadRuntime) return
+
+    const pendingMessage = sessionStorage.getItem('pendingMessage')
+    const pendingMode = sessionStorage.getItem('pendingMode')
+
+    if (pendingMessage) {
+      // Clear from sessionStorage
+      sessionStorage.removeItem('pendingMessage')
+      sessionStorage.removeItem('pendingMode')
+
+      // Set mode if provided
+      if (pendingMode && (pendingMode === 'chat' || pendingMode === 'image')) {
+        onModeChange(pendingMode as ChatMode)
+      }
+
+      // Wait a bit for runtime to be ready
+      setTimeout(() => {
+        // Set the message in composer
+        threadRuntime.composer.setText(pendingMessage)
+        // Send it
+        threadRuntime.composer.send()
+      }, 100)
+    }
+  }, [threadRuntime, onModeChange])
+
+  return <Thread isLoading={false} mode={mode} onModeChange={onModeChange} />
+}
 
 function ChatPage() {
   const params = useParams()
   const conversationId = params.conversationId as string
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Mode state management
+  const [mounted, setMounted] = useState(false)
+  const [mode, setMode] = useState<ChatMode>('chat')
+
+  // Load mode from localStorage after mount
+  useEffect(() => {
+    setMounted(true)
+    const saved = localStorage.getItem('chat-mode')
+    if (saved === 'image') {
+      setMode('image')
+    }
+  }, [])
+
+  // Save mode to localStorage when it changes
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem('chat-mode', mode)
+    }
+  }, [mode, mounted])
 
   const HistoryAdapter: ThreadHistoryAdapter = {
 
@@ -32,7 +86,7 @@ function ChatPage() {
         }
 
         if (historyData.length === 0) {
-          setError('Conversation not found')
+          // New conversation - no error, just empty
           setIsLoadingHistory(false)
           return { messages: [] };
         }
@@ -49,11 +103,10 @@ function ChatPage() {
 
     async append() {
       // The message will be saved automatically by your backend when streaming completes
-      // You might want to implement this if you need to save messages immediately
     },
   }
 
-  const runtime = ChatWithConversationIDAPIRuntime(conversationId, HistoryAdapter)
+  const runtime = ChatWithConversationIDAPIRuntime(conversationId, HistoryAdapter, mode)
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
@@ -74,8 +127,8 @@ function ChatPage() {
             </div>
           </div>
         ) : (
-          // Show main chat interface with loading skeleton when needed
-          <Thread isLoading={isLoadingHistory} />
+          // Show main chat interface
+          <ConversationContent mode={mode} onModeChange={setMode} />
         )}
       </div>
     </AssistantRuntimeProvider>

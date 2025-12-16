@@ -15,6 +15,7 @@ export function getPersonalizedSiteConfig(personalization?: PersonalizationSetti
       ...config.logo,
       src: personalization.siteIcon,
       alt: `${personalization.siteName} Logo`
-    }
+    },
+    primaryColor: personalization.primaryColor
   }
 }
