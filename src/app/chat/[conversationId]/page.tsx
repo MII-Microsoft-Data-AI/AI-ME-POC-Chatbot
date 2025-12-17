@@ -8,6 +8,7 @@ import { useConversationHistory } from '@/hooks/chat/useConversationHistory'
 import { ConversationContent } from '@/components/features/chat/ConversationContent'
 import { ErrorState } from '@/components/features/chat/ErrorState'
 import { ChatLayout } from '@/components/features/chat/ChatLayout'
+import { GenerateImageUI } from '@/components/assistant-ui/tool-ui/ImageGeneration'
 
 function ConversationPage() {
   const params = useParams()
@@ -28,11 +29,14 @@ function ConversationPage() {
         {error ? (
           <ErrorState error={error} onRetry={() => window.location.reload()} />
         ) : (
-          <ConversationContent
-            mode={mode}
-            onModeChange={setMode}
-            isLoading={isLoadingHistory}
-          />
+          <>
+            <GenerateImageUI />
+            <ConversationContent
+              mode={mode}
+              onModeChange={setMode}
+              isLoading={isLoadingHistory}
+              />
+          </>
         )}
       </AssistantRuntimeProvider>
     </ChatLayout>
