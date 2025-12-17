@@ -7,6 +7,18 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'components.json'
+      - 'package.json'
+      - 'bun.lock'
+      - 'next.config.ts'
+      - 'next-env.d.ts'
+      - 'tsconfig.json'
+      - 'postcss.config.mjs'
+      - 'eslint.config.mjs'
+      - '.github/workflows/main_appservice-poc-chatbot-frontend.yml'
   workflow_dispatch:
 
 jobs:

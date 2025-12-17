@@ -8,6 +8,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'mock-backend/**'
+      - '.github/workflows/main_appservice-poc-chatbot-backend.yml'
   workflow_dispatch:
 
 jobs:
