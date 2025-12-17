@@ -6,6 +6,7 @@ import {
   MessagePrimitive,
   ThreadPrimitive,
   useAssistantState,
+  useThreadRuntime,
 } from "@assistant-ui/react";
 import {
   ArrowDownIcon,
@@ -19,6 +20,8 @@ import {
   RefreshCwIcon,
   Square,
   Loader2,
+  MessageSquare,
+  Image,
 } from "lucide-react";
 import type { FC } from "react";
 import { useState } from "react";
@@ -157,14 +160,14 @@ const ThreadWelcome: FC<{ mode?: ChatMode; onModeChange?: (mode: ChatMode) => vo
                   <button
                     onClick={() => onModeChange('chat')}
                     className={cn(
-                      "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
-                      mode === 'chat' 
-                        ? "border-primary bg-primary/5" 
-                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                      "flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 bg-white transition-all hover:bg-gray-50",
+                       mode === 'chat' && "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
                     )}
                   >
-                    <span className="text-2xl">💬</span>
-                    <span className="text-sm font-medium">Chat</span>
+                    <div className={cn("p-2 rounded-lg bg-gray-100", mode === 'chat' && "bg-primary/10")}>
+                        <MessageSquare className={cn("w-6 h-6 text-gray-500", mode === 'chat' && "text-primary")} strokeWidth={1.5} />
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">Chat</span>
                     <span className="text-xs text-muted-foreground text-center">Have a conversation</span>
                   </button>
                   
@@ -172,14 +175,14 @@ const ThreadWelcome: FC<{ mode?: ChatMode; onModeChange?: (mode: ChatMode) => vo
                   <button
                     onClick={() => onModeChange('image')}
                     className={cn(
-                      "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
-                      mode === 'image' 
-                        ? "border-primary bg-primary/5" 
-                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                      "flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 bg-white transition-all hover:bg-gray-50",
+                      mode === 'image' && "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
                     )}
                   >
-                    <span className="text-2xl">✨</span>
-                    <span className="text-sm font-medium">Image Generation</span>
+                     <div className={cn("p-2 rounded-lg bg-gray-100", mode === 'image' && "bg-primary/10")}>
+                        <Image className={cn("w-6 h-6 text-gray-500", mode === 'image' && "text-primary")} strokeWidth={1.5} />
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">Image Generation</span>
                     <span className="text-xs text-muted-foreground text-center">Create images</span>
                   </button>
                 </div>
@@ -195,6 +198,12 @@ const ThreadWelcome: FC<{ mode?: ChatMode; onModeChange?: (mode: ChatMode) => vo
 const ThreadWelcomeSuggestions: FC = () => {
   const { settings } = usePersonalizationContext()
   const config = getPersonalizedSiteConfig(settings)
+  const threadRuntime = useThreadRuntime()
+
+  const handleSuggestionClick = (title: string, action: string) => {
+    threadRuntime.composer.setText(action)
+    threadRuntime.composer.send()
+  }
 
   return (
     <div className="aui-thread-welcome-suggestions grid w-full gap-2 @md:grid-cols-2">
@@ -208,75 +217,21 @@ const ThreadWelcomeSuggestions: FC = () => {
           key={`suggested-action-${suggestedAction}-${index}`}
           className="aui-thread-welcome-suggestion-display [&:nth-child(n+3)]:hidden @md:[&:nth-child(n+3)]:block"
         >
-          <ThreadPrimitive.Suggestion
-            prompt={suggestedAction}
-            method="replace"
-            autoSend
-            asChild
-          >
-            <Button
-              variant="ghost"
-              className="aui-thread-welcome-suggestion  w-full h-full flex-1 flex-wrap items-start justify-start gap-1 rounded-3xl border px-5 py-4 text-left text-sm @md:flex-col dark:hover:bg-accent/60"
-              aria-label={suggestedAction}
-            >
-              <span className="aui-thread-welcome-suggestion-text-1 font-medium text-primary"> {suggestedAction.split(" ")[0]}</span>  
-              <span className="aui-thread-welcome-suggestion-text-2 text-muted-foreground text-wrap text-ellipsis"> {suggestedAction.split(" ").slice(1).join(" ")}</span>
-            </Button>
-          </ThreadPrimitive.Suggestion>
+              <Button
+                variant="ghost"
+                className="aui-thread-welcome-suggestion w-full h-full flex items-center justify-start gap-3 rounded-xl border bg-white p-4 text-left text-sm transition-all hover:bg-gray-50 hover:shadow-sm dark:bg-gray-900 dark:hover:bg-gray-800"
+                aria-label={suggestedAction}
+                onClick={() => handleSuggestionClick(suggestedAction, suggestedAction)}
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                   <MessageSquare className="h-4 w-4 text-primary" strokeWidth={1.5} />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                   <span className="font-medium text-gray-900 dark:text-gray-100">{suggestedAction}</span>
+                </div>
+              </Button>
         </m.div>
       ))}
-
-      {/* {[
-        {
-          title: "What's the weather",
-          label: "in San Francisco?",
-          action: "What's the weather in San Francisco?",
-        },
-        {
-          title: "Explain React hooks",
-          label: "like useState and useEffect",
-          action: "Explain React hooks like useState and useEffect",
-        },
-        {
-          title: "Write a SQL query",
-          label: "to find top customers",
-          action: "Write a SQL query to find top customers",
-        },
-        {
-          title: "Create a meal plan",
-          label: "for healthy weight loss",
-          action: "Create a meal plan for healthy weight loss",
-        },
-      ].map((suggestedAction, index) => (
-        <m.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 20 }}
-          transition={{ delay: 0.05 * index }}
-          key={`suggested-action-${suggestedAction.title}-${index}`}
-          className="aui-thread-welcome-suggestion-display [&:nth-child(n+3)]:hidden @md:[&:nth-child(n+3)]:block"
-        >
-          <ThreadPrimitive.Suggestion
-            prompt={suggestedAction.action}
-            method="replace"
-            autoSend
-            asChild
-          >
-            <Button
-              variant="ghost"
-              className="aui-thread-welcome-suggestion h-auto w-full flex-1 flex-wrap items-start justify-start gap-1 rounded-3xl border px-5 py-4 text-left text-sm @md:flex-col dark:hover:bg-accent/60"
-              aria-label={suggestedAction.action}
-            >
-              <span className="aui-thread-welcome-suggestion-text-1 font-medium">
-                {suggestedAction.title}
-              </span>
-              <span className="aui-thread-welcome-suggestion-text-2 text-muted-foreground">
-                {suggestedAction.label}
-              </span>
-            </Button>
-          </ThreadPrimitive.Suggestion>
-        </m.div>
-      ))} */}
     </div>
   );
 };

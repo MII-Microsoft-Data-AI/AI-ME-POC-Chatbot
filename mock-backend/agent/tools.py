@@ -23,6 +23,8 @@ Environment Variables Required:
 """
 import os
 from datetime import datetime
+from typing import Optional
+from pydantic import BaseModel, Field
 from langchain_core.tools import tool
 from langchain_azure_dynamic_sessions import SessionsPythonREPLTool
 from langchain_community.utilities import SearxSearchWrapper
@@ -33,8 +35,33 @@ from dotenv import load_dotenv
 # Load environment variables from .env file if present
 load_dotenv()
 
+# Pydantic models for tool arguments
+class WebSearchInput(BaseModel):
+    """Input schema for web_search tool."""
+    query: str = Field(..., description="The search query string to look up on the web")
+
+class AzureSearchInput(BaseModel):
+    """Input schema for Azure Search tools."""
+    query: str = Field(..., description="The search query string")
+    top: int = Field(5, description="Number of results to return (default: 5, max: 50)", ge=1, le=50)
+
+class AzureSearchFilterInput(BaseModel):
+    """Input schema for Azure Search filter tool."""
+    query: str = Field(..., description="The search query string")
+    filter_expression: str = Field(..., description="OData filter expression (e.g., \"userid eq 'mock-user-1'\")")
+    top: int = Field(5, description="Number of results to return (default: 5, max: 50)", ge=1, le=50)
+
+
 
 tool_generator = []
+
+# Initialize Azure OpenAI client for DALL-E
+def get_dalle_client():
+    return AzureOpenAI(
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2025-01-01-preview"),
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    )
 
 @tool
 def get_current_time() -> str:
@@ -54,38 +81,68 @@ if os.getenv("AZURE_SESSIONPOOL_ENDPOINT"):
     tool_generator.append(code_tool)
 
 if os.getenv("SEARXNG_URL"):
-    search = SearxSearchWrapper(searx_host=os.getenv("SEARXNG_URL"))
-
-    @tool
-    def web_search(query: str) -> str:
-        """Perform a web search using SearxNG.
+    searxng_url = os.getenv("SEARXNG_URL")
+    print(f"🌐 Initializing SearxNG with URL: {searxng_url}")
+    
+    try:
+        search = SearxSearchWrapper(searx_host=searxng_url)
         
-        Args:
-            query: Search query string
+        @tool(args_schema=WebSearchInput)
+        def web_search(query: str) -> str:
+            """Perform a web search using SearxNG to find information on the internet.
             
-        Returns:
-            str: Search results
-        """
-        results = search.results(
-            query,
-            num_results=5,
-        )
+            Use this tool when you need to search for current information, news, articles,
+            or any content available on the web that is not in the Azure Search index.
+            
+            Args:
+                query: The search query string. Be specific and descriptive.
+                
+            Returns:
+                str: Search results with titles, URLs, and snippets from the web
+            """
+            try:
+                print(f"🔍 Web search: query='{query}', num_results=5")
+                
+                results = search.results(
+                    query,
+                    num_results=5,
+                )
 
-        if not results:
-            return f"No results found for query: '{query}'"
+                if not results:
+                    print(f"  ⚠️ No results returned from SearxNG")
+                    return f"No web search results found for query: '{query}'"
+                
+                print(f"  ✅ Found {len(results)} results")
+                
+                final_results = f"Found {len(results)} web search results for '{query}':\n\n"
+                for i, result in enumerate(results, 1):
+                    title = result.get("title", "No title")
+                    link = result.get("link", "No link")
+                    snippet = result.get("snippet", "No snippet")
+                    
+                    final_results += f"## Result {i}: {title}\n"
+                    final_results += f"**URL**: {link}\n"
+                    final_results += f"{snippet}\n\n"
+                    final_results += "---\n\n"
+
+                return final_results
+                
+            except Exception as e:
+                error_msg = f"Error performing web search: {str(e)}"
+                print(f"  ❌ {error_msg}")
+                import traceback
+                print(traceback.format_exc())
+                return error_msg
+
+        tool_generator.append(web_search)
+        print(f"  ✅ web_search tool loaded successfully")
         
-        print(f"Web search results: {results}")
-        
-        final_results = "Search results:\n"
-        for x in results:
-            final_results += f"""
-# {x["title"]} 
-- URL: {x["link"]}
-- Snippet: {x["snippet"]}\n"""
-
-        return final_results
-
-    tool_generator.append(web_search)
+    except Exception as e:
+        print(f"  ❌ Failed to initialize SearxNG: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+else:
+    print("  ⚠️ SEARXNG_URL not set, web_search tool will not be available")
 
 # Azure AI Search tools
 if (os.getenv("AZURE_SEARCH_ENDPOINT") and 
@@ -98,7 +155,7 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
         credential=AzureKeyCredential(os.getenv("AZURE_SEARCH_API_KEY"))
     )
 
-    @tool
+    @tool(args_schema=AzureSearchInput)
     def azure_search_documents(query: str, top: int = 5) -> str:
         """Search documents in Azure AI Search using text-based search.
         
@@ -107,10 +164,12 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
             top: Number of results to return (default: 5, max: 50)
             
         Returns:
-            str: Formatted search results with titles, content, and metadata
+            str: Formatted search results with content and metadata
         """
         try:
             top = min(max(1, top), 50)  # Ensure top is between 1 and 50
+            print(f"🔍 Text search: query='{query}', top={top}")
+            
             results = search_client.search(
                 search_text=query,
                 top=top,
@@ -118,39 +177,49 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
             )
             
             formatted_results = []
+            result_count = 0
             for result in results:
+                result_count += 1
+                print(f"  📄 Result {result_count}: score={getattr(result, '@search.score', 'N/A')}")
+                
                 formatted_result = {
                     "score": getattr(result, "@search.score", "N/A"),
-                    "title": result.get("title", "No title"),
                     "content": result.get("content", "No content"),
-                    "metadata": {k: v for k, v in result.items() if not k.startswith("@") and k not in ["title", "content"]}
+                    "metadata": {k: v for k, v in result.items() if not k.startswith("@") and k not in ["content"]}
                 }
                 formatted_results.append(formatted_result)
+            
+            print(f"  ✅ Total results found: {result_count}")
             
             if not formatted_results:
                 return f"No results found for query: '{query}'"
             
             # Format results as readable text
             output = f"Found {len(formatted_results)} results for '{query}':\n\n"
-            for result in formatted_results:
+            for i, result in enumerate(formatted_results, 1):
                 filename = result['metadata'].get('filename', 'Unknown')
                 chunk_index = result['metadata'].get('chunk_index', 0)
                 id_ = result['metadata'].get('id', 'Unknown')
                 content = result['content']
-                output += f"# File: {filename} Chunk [{chunk_index}]\n"
-                output += f"**chunk_id/id**: `{id_}`\n"
-                output += "Content:\n```\n"
-                output += f"{content}\n"
-                output += "```\n\n"
+                score = result['score']
+                
+                output += f"## Result {i} (Score: {score:.4f})\n"
+                output += f"**File**: {filename} | **Chunk**: {chunk_index} | **ID**: `{id_}`\n\n"
+                output += f"{content}\n\n"
+                output += "---\n\n"
             
             return output
             
         except Exception as e:
-            return f"Error searching Azure AI Search: {str(e)}"
+            error_msg = f"Error searching Azure AI Search: {str(e)}"
+            print(f"  ❌ {error_msg}")
+            import traceback
+            print(traceback.format_exc())
+            return error_msg
 
     tool_generator.append(azure_search_documents)
 
-    @tool
+    @tool(args_schema=AzureSearchInput)
     def azure_search_semantic(query: str, top: int = 5) -> str:
         """Search documents in Azure AI Search using semantic search capabilities.
         
@@ -164,8 +233,9 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
         try:
             top = min(max(1, top), 50)  # Ensure top is between 1 and 50
             
-            # Check if semantic search is configured
-            semantic_config = "my-semantic-config"
+            # Get semantic configuration from env or use default
+            semantic_config = os.getenv("AZURE_SEARCH_SEMANTIC_CONFIG", "my-semantic-config")
+            print(f"🔍 Semantic search: query='{query}', top={top}, config='{semantic_config}'")
             
             results = search_client.search(
                 search_text=query,
@@ -178,50 +248,100 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
             )
             
             formatted_results = []
+            result_count = 0
             for result in results:
+                result_count += 1
+                score = getattr(result, "@search.score", "N/A")
+                print(f"  📄 Result {result_count}: score={score}")
+                
                 # Get semantic captions if available
                 captions = getattr(result, "@search.captions", [])
                 caption_text = captions[0].text if captions else result.get("content", "No content")[:300]
                 
                 formatted_result = {
-                    "score": getattr(result, "@search.score", "N/A"),
-                    "title": result.get("title", "No title"),
+                    "score": score,
                     "caption": caption_text,
                     "content": result.get("content", "No content"),
-                    "metadata": {k: v for k, v in result.items() if not k.startswith("@") and k not in ["title", "content"]}
+                    "metadata": {k: v for k, v in result.items() if not k.startswith("@") and k not in ["content"]}
                 }
                 formatted_results.append(formatted_result)
             
+            print(f"  ✅ Total results found: {result_count}")
+            
             if not formatted_results:
-                return f"No semantic results found for query: '{query}'"
+                return f"No semantic results found for query: '{query}'\n\nℹ️ Possible reasons:\n- Semantic configuration '{semantic_config}' doesn't exist in index\n- Query doesn't match any documents\n- Try using regular text search instead"
             
             # Format results as readable text
             output = f"Found {len(formatted_results)} semantic results for '{query}':\n\n"
-            for result in formatted_results:
+            for i, result in enumerate(formatted_results, 1):
                 filename = result['metadata'].get('filename', 'Unknown')
                 chunk_index = result['metadata'].get('chunk_index', 0)
                 id_ = result['metadata'].get('id', 'Unknown')
                 content = result['content']
-                output += f"# File: {filename} Chunk [{chunk_index}]\n"
-                output += f"**chunk_id/id**: `{id_}`\n"
-                output += "Content:\n```\n"
-                output += f"{content}\n"
-                output += "```\n\n"
+                score = result['score']
+                
+                output += f"## Result {i} (Score: {score})\n"
+                output += f"**File**: {filename} | **Chunk**: {chunk_index} | **ID**: `{id_}`\n\n"
+                output += f"{content}\n\n"
+                output += "---\n\n"
             
             return output
             
         except Exception as e:
-            return f"Error performing semantic search: {str(e)}"
+            error_msg = f"Error performing semantic search: {str(e)}"
+            print(f"  ❌ {error_msg}")
+            import traceback
+            print(traceback.format_exc())
+            return error_msg
 
     tool_generator.append(azure_search_semantic)
 
     @tool
+    def generate_image(prompt: str) -> str:
+        """Generate an image using DALL-E.
+        
+        Args:
+            prompt: Prompt for image generation
+            
+        Returns:
+            str: Generated image URL
+        """
+        try:
+            print(f"🔍 Image generation: prompt='{prompt}'")
+            
+            client = get_dalle_client()
+            deployment_name = os.getenv("AZURE_OPENAI_DALLE_DEPLOYMENT_NAME", "dall-e-3")
+        
+            # Generate image
+            result = client.images.generate(
+                model=deployment_name,
+                prompt=prompt,
+                size="1024x1024",
+                quality="standard",
+                style="vivid",
+                n=1,
+            )
+            
+            image_url = result.data[0].url
+            print(f"  ✅ Image generated: {image_url}")
+            return f"Use this image URL and change it to markdow to show the image. Image generated link: {image_url}"
+            
+        except Exception as e:
+            error_msg = f"Error generating image: {str(e)}"
+            print(f"  ❌ {error_msg}")
+            import traceback
+            print(traceback.format_exc())
+            return error_msg
+
+    tool_generator.append(generate_image)
+
+    @tool(args_schema=AzureSearchFilterInput)
     def azure_search_filter(query: str, filter_expression: str, top: int = 5) -> str:
         """Search documents in Azure AI Search with OData filter expressions.
         
         Args:
             query: Search query string
-            filter_expression: OData filter expression (e.g., "category eq 'technology'")
+            filter_expression: OData filter expression (e.g., "userid eq 'mock-user-1'")
             top: Number of results to return (default: 5, max: 50)
             
         Returns:
@@ -229,6 +349,8 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
         """
         try:
             top = min(max(1, top), 50)  # Ensure top is between 1 and 50
+            print(f"🔍 Filtered search: query='{query}', filter='{filter_expression}', top={top}")
+            
             results = search_client.search(
                 search_text=query,
                 filter=filter_expression,
@@ -237,35 +359,45 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
             )
             
             formatted_results = []
+            result_count = 0
             for result in results:
+                result_count += 1
+                print(f"  📄 Result {result_count}: score={getattr(result, '@search.score', 'N/A')}")
+                
                 formatted_result = {
                     "score": getattr(result, "@search.score", "N/A"),
-                    "title": result.get("title", "No title"),
                     "content": result.get("content", "No content"),
-                    "metadata": {k: v for k, v in result.items() if not k.startswith("@") and k not in ["title", "content"]}
+                    "metadata": {k: v for k, v in result.items() if not k.startswith("@") and k not in ["content"]}
                 }
                 formatted_results.append(formatted_result)
+            
+            print(f"  ✅ Total results found: {result_count}")
             
             if not formatted_results:
                 return f"No results found for query: '{query}' with filter: '{filter_expression}'"
             
             # Format results as readable text
             output = f"Found {len(formatted_results)} filtered results for '{query}' (Filter: {filter_expression}):\n\n"
-            for result in formatted_results:
+            for i, result in enumerate(formatted_results, 1):
                 filename = result['metadata'].get('filename', 'Unknown')
                 chunk_index = result['metadata'].get('chunk_index', 0)
                 id_ = result['metadata'].get('id', 'Unknown')
                 content = result['content']
-                output += f"# File: {filename} Chunk [{chunk_index}]\n"
-                output += f"**chunk_id/id**: `{id_}`\n"
-                output += "Content:\n```\n"
-                output += f"{content}\n"
-                output += "```\n\n"
+                score = result['score']
+                
+                output += f"## Result {i} (Score: {score:.4f})\n"
+                output += f"**File**: {filename} | **Chunk**: {chunk_index} | **ID**: `{id_}`\n\n"
+                output += f"{content}\n\n"
+                output += "---\n\n"
             
             return output
             
         except Exception as e:
-            return f"Error performing filtered search: {str(e)}"
+            error_msg = f"Error performing filtered search: {str(e)}"
+            print(f"  ❌ {error_msg}")
+            import traceback
+            print(traceback.format_exc())
+            return error_msg
 
     tool_generator.append(azure_search_filter)
 
@@ -280,7 +412,7 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
                 azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
             )
             
-            @tool
+            @tool(args_schema=AzureSearchInput)
             def azure_search_vector(query: str, top: int = 5) -> str:
                 """Search documents in Azure AI Search using vector similarity.
                 
@@ -296,14 +428,19 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
                     
                     # Generate embedding for the query
                     embedding_model = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME", "text-embedding-ada-002")
+                    print(f"🔍 Vector search: query='{query}', top={top}, embedding_model='{embedding_model}'")
+                    
                     response = openai_client.embeddings.create(
                         input=query,
                         model=embedding_model
                     )
                     query_vector = response.data[0].embedding
+                    print(f"  ✅ Generated embedding vector (dim={len(query_vector)})")
                     
                     # Perform vector search
-                    vector_field = "content_vector"
+                    vector_field = os.getenv("AZURE_SEARCH_VECTOR_FIELD", "content_vector")
+                    print(f"  🔍 Searching vector field: '{vector_field}'")
+                    
                     vector_query = VectorizedQuery(
                         vector=query_vector,
                         k_nearest_neighbors=top,
@@ -317,7 +454,11 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
                     )
                     
                     formatted_results = []
+                    result_count = 0
                     for result in results:
+                        result_count += 1
+                        print(f"  📄 Result {result_count}: {list(result.keys())}")
+                        
                         formatted_result = {
                             "title": result.get("title", "No title"),
                             "content": result.get("content", "No content"),
@@ -325,8 +466,10 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
                         }
                         formatted_results.append(formatted_result)
                     
+                    print(f"  ✅ Total results found: {result_count}")
+                    
                     if not formatted_results:
-                        return f"No vector results found for query: '{query}'"
+                        return f"No vector results found for query: '{query}'\n\nℹ️ Possible reasons:\n- Index is empty\n- Vector field '{vector_field}' doesn't exist\n- No documents have embeddings\n- Embedding dimension mismatch"
                     
                     # Format results as readable text
                     output = f"Found {len(formatted_results)} vector similarity results for '{query}':\n\n"
@@ -344,7 +487,11 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
                     return output
                     
                 except Exception as e:
-                    return f"Error performing vector search: {str(e)}"
+                    error_msg = f"Error performing vector search: {str(e)}"
+                    print(f"  ❌ {error_msg}")
+                    import traceback
+                    print(traceback.format_exc())
+                    return error_msg
 
             tool_generator.append(azure_search_vector)
             

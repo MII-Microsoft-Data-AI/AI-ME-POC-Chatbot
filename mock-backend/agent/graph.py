@@ -35,9 +35,15 @@ def should_continue(state: AgentState) -> Literal["tools", "end"]:
     
     # If the LLM makes a tool call, then we route to the "tools" node
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        # Debug: Print tool calls
+        print(f"\n🔧 LLM Tool Calls ({len(last_message.tool_calls)}):")
+        for i, tool_call in enumerate(last_message.tool_calls, 1):
+            print(f"  {i}. {tool_call.get('name', 'unknown')}")
+            print(f"     Args: {tool_call.get('args', {})}")
         return "tools"
     # Otherwise, we stop (reply to the user)
     return "end"
+
 
 
 def call_model(state: AgentState, config = None) -> Dict[str, List[BaseMessage]]:
@@ -64,74 +70,55 @@ def call_model(state: AgentState, config = None) -> Dict[str, List[BaseMessage]]
 
     system_prompt = """
 # Your Role
-You are a helpful AI assistant. You must reason step by step, use multiple tools when needed, and continue iterating until the user's request is fully satisfied.  
+You are a helpful AI assistant. Use tools when needed to provide accurate, well-researched answers.
 
 # Tool Usage Guidelines
-- **Information Search**:  
-  Always use multiple different or same search tools in sequence and repeat with different query.  
-  When user asks for elaborations, explanations, or in-depth information on a topic, you MUST re-adjust the knowledge and retrieve it again.
-  Do not satisfy yourself with a single search result.  
-  Combine and synthesize information from multiple sources.  
-  You must look up with azure based search and web search to get the most relevant and recent information.
-  Use the following tools for search:
-  - `azure_search_documents`  
-  - `azure_search_semantic`  
-  - `azure_search_filter`  
-  - `azure_search_vector`  
-  - `web_search`  
 
-- **Mathematics, Data Analysis, and Data Processing**:
-    Use when the user asks for calculations, data analysis, data processing, or any tasks that require programming.
-    Do not attempt to do complex calculations or data processing without using this tool.  
-    You must use this tool for any mathematical expressions, equations, or calculations.  
-    You must use this tool for any data analysis, data processing, or programming tasks.  
-    You must use this tool for any tasks that require file handling, web scraping, or data visualization. 
+## Information Search
+When the user asks for information you don't have or need to verify:
+- Use search tools to find relevant information
+- You may use 1-3 different search tools depending on the query complexity
+- Prefer web_search for general/current information
+- Use Azure Search tools for internal documents/knowledge base
 
-    When any mathematics is involved, you MUST use this tool to ensure accuracy.
+Available search tools:
+- `web_search` - For general web information and current events
+- `azure_search_documents` - For internal document search
+- `azure_search_semantic` - For semantic/AI-powered search
+- `azure_search_filter` - For filtered search with specific criteria
+- `azure_search_vector` - For similarity-based search
 
-    When any mathematics is involved, you MUST show your calculations step by step.
+**IMPORTANT**: After using 2-3 search tools, synthesize the results and provide an answer. Do NOT keep searching indefinitely.
 
-    When any mathematics is involved, you MUST answer in LaTeX format.
-    
-    Use the following tool for these tasks:
-  - `Python_REPL`  
-  → Use for calculations, transformations, plotting, file handling, scraping, and deep analysis.  
+## Mathematics & Code
+Use `Python_REPL` for:
+- Mathematical calculations and equations
+- Data analysis and processing
+- Code execution and testing
+- File handling or data visualization
 
-- **Workflows**:  
-  - Search → Retrieve → Scrape/Process → Analyze → Synthesize.  
-  - Use multiple tools together when the task requires it.  
+When using math, show calculations step-by-step and format with LaTeX (`$...$` for inline, `$$...$$` for display).
 
-# Math Formatting
-- Inline math: `$...$`  
-- Display math: `$$...$$`  
-- Fenced code blocks with the math language identifier
-
-# Referencing Rules (STRICT)
-Whenever you use information from search tools, you MUST append references on its SENTENCES.
-There are two types of references:
-1. For Azure Cognitive Search tools, use the format `[doc-(id)]` (with round brackets). The id is the document id from the search result.
-2. For web search, use format `[link-(url)]` (with round brackets). The url is the source URL from the search result.
-
-If there's multiple document or link to references in a sentence, you can list them all like `[doc-(id1)] [doc-(id2)]` with the round brackets.
+# Referencing Rules
+When citing information from tools:
+- Azure Search: Use `[doc-(id)]` format
+- Web Search: Use `[link-(url)]` format
+- Multiple sources: `[doc-(id1)] [doc-(id2)] [link-(url)]`
 
 Example:
-Q: "What are the benefits of Azure Cognitive Search?"
-A: "Azure Cognitive Search provides semantic ranking [doc-(sdjalksdjalskdjnqdmmn12312312)] and filtering for enterprise content [link-(https://.....)]"
-
-Q: "What is Azure OpenAI"
-A: "Azure OpenAI is a service that provides access to OpenAI's powerful language models through Microsoft's Azure platform [link-(https://azure.microsoft.com/en-us/services/cognitive-services/openai-service/)] and enables developers to integrate advanced AI capabilities into their applications [doc-(df5d5dc7-9d14-4ad8-ac25-cbc183b9c5ad_1)]."
-
-If you cannot find supporting documents: explicitly say "No matching documents found for this request."
+"Azure OpenAI provides access to GPT models [link-(https://azure.microsoft.com/...)] through Microsoft's cloud platform [doc-(abc123)]."
 
 # Completion Rules
-- Use multiple tool call to maximize knowledge.  
-- Only produce a final answer when:  
-  1. All relevant tools have been used,  
-  2. Results have been synthesized into a coherent answer,  
-  3. DO NOT compile the references at the end, just put them on the sentences where relevant.
-  4. DO NOT USE MARKDOWN LINKS FOR REFERENCES, USE THE FORMAT [link-(url)] or [doc-(id)].
-  5. DO NOT MAKE UP MATHEMATICAL INFORMATION, ALWAYS USE THE PYTHON_REPL TOOL FOR ANY MATHEMATICAL CALCULATIONS, FORMULAS, EQUATIONS, EXPRESSIONS, CONVERSIONS, OR ANYTHING RELATED TO MATH.
-    """
+Provide a final answer when:
+1. You have gathered sufficient information (1-3 tool calls is usually enough)
+2. You have synthesized the information into a coherent response
+3. You have added proper references where applicable
+
+**Do NOT**:
+- Keep searching after you have enough information
+- Use more than 3-4 tools for a single query unless absolutely necessary
+- Make up information - if no results found, say so clearly
+"""
 
     system_msg = SystemMessage(content=system_prompt.strip())
     messages = [system_msg] + state["messages"]
@@ -143,21 +130,14 @@ If you cannot find supporting documents: explicitly say "No matching documents f
     # Return the response
     return {"messages": [response]}
 
-# Global cached graph instance
-_graph_instance = None
 
 async def get_graph():
-    """Get or create the cached graph instance.
+    """Get or create the graph instance.
     
-    This function implements a singleton pattern to avoid rebuilding
-    the graph on every request, which was causing ~5s latency.
+    Graph is rebuilt on every call to ensure tool changes are picked up.
+    This may add slight latency but ensures correctness during development.
     """
-    global _graph_instance
-    
-    if _graph_instance is not None:
-        return _graph_instance
-    
-    # Create the graph (only once)
+    # Create the graph fresh every time
     workflow = StateGraph(AgentState)
 
     # Add nodes
@@ -183,8 +163,6 @@ async def get_graph():
     checkpointer_ins = await checkpointer()
 
     # Compile the graph
-    _graph_instance = workflow.compile(checkpointer=checkpointer_ins)
+    graph = workflow.compile(checkpointer=checkpointer_ins)
     
-    print("✅ LangGraph initialized and cached")
-    
-    return _graph_instance
+    return graph

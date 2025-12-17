@@ -1,99 +1,12 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { Thread } from '@/components/assistant-ui/thread'
-import { AssistantRuntimeProvider, useThreadRuntime } from '@assistant-ui/react'
-import type { ChatMode } from '@/components/assistant-ui/thread'
-import { useRouter } from 'next/navigation'
-import { useLocalRuntime } from '@assistant-ui/react'
-import { CreateConversation } from '@/lib/integration/client/chat-conversation'
+import { AssistantRuntimeProvider, useLocalRuntime } from '@assistant-ui/react'
+import { useChatMode } from '@/hooks/chat/useChatMode'
+import { NewChatContent } from '@/components/features/chat/NewChatContent'
+import { ChatLayout } from '@/components/features/chat/ChatLayout'
 
-function ChatPageContent({ mode, onModeChange }: { mode: ChatMode; onModeChange: (mode: ChatMode) => void }) {
-  const router = useRouter()
-  const threadRuntime = useThreadRuntime()
-  const [isCreating, setIsCreating] = useState(false)
-
-  // Override composer send to create conversation first
-  useEffect(() => {
-    if (!threadRuntime) return
-
-    // Store original send function
-    const originalSend = threadRuntime.composer.send
-
-    // Override send function
-    threadRuntime.composer.send = async () => {
-      try {
-        // Get the message from composer
-        const composerState = threadRuntime.composer.getState()
-        const message = composerState.text
-
-        if (!message.trim()) return
-
-        setIsCreating(true)
-
-        // Generate ID client-side
-        const conversationId = crypto.randomUUID()
-
-        console.log('Creating conversation:', conversationId)
-        
-        // Create conversation with 30s timeout
-        const createPromise = CreateConversation(conversationId)
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Conversation creation timeout (30s)')), 30000)
-        )
-        
-        const createdId = await Promise.race([createPromise, timeoutPromise]) as string | null
-
-        if (!createdId) {
-          throw new Error('Failed to create conversation')
-        }
-
-        console.log('Conversation created successfully:', createdId)
-        
-        // Store message in sessionStorage to send after redirect
-        sessionStorage.setItem('pendingMessage', message)
-        sessionStorage.setItem('pendingMode', mode)
-        
-        // Now redirect - conversation is guaranteed to exist
-        router.push(`/chat/${createdId}`)
-        
-      } catch (error) {
-        console.error('Failed to create conversation:', error)
-        setIsCreating(false)
-        // Show error to user
-        const errorMessage = error instanceof Error ? error.message : 'Failed to create conversation'
-        alert(`${errorMessage}. Please try again.`)
-      }
-    }
-
-    return () => {
-      // Restore original send on cleanup
-      threadRuntime.composer.send = originalSend
-    }
-  }, [threadRuntime, router, mode])
-
-  return <Thread mode={mode} onModeChange={onModeChange} isCreating={isCreating} />
-}
-
-function ChatPage() {
-  const [mounted, setMounted] = useState(false)
-  const [mode, setMode] = useState<ChatMode>('chat')
-
-  // Load mode from localStorage after mount
-  useEffect(() => {
-    setMounted(true)
-    const saved = localStorage.getItem('chat-mode')
-    if (saved === 'image') {
-      setMode('image')
-    }
-  }, [])
-
-  // Save mode to localStorage when it changes
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem('chat-mode', mode)
-    }
-  }, [mode, mounted])
+function NewChatPage() {
+  const { mode, setMode } = useChatMode()
 
   // Create a minimal local runtime that does nothing
   // We only need this to satisfy the Thread component
@@ -103,16 +16,16 @@ function ChatPage() {
       // This will never be called because we override composer.send
       // But we need it to satisfy the type requirements
       return
-    }
+    },
   })
 
   return (
-    <div className='h-screen pt-16 md:pt-0'>
+    <ChatLayout>
       <AssistantRuntimeProvider runtime={runtime}>
-        <ChatPageContent mode={mode} onModeChange={setMode} />
+        <NewChatContent mode={mode} onModeChange={setMode} />
       </AssistantRuntimeProvider>
-    </div>
+    </ChatLayout>
   )
 }
 
-export default ChatPage
+export default NewChatPage
