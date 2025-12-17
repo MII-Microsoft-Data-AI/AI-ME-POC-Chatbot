@@ -89,6 +89,7 @@ async def generate_image_stream(prompt: str, conversation_id: str):
 
 class CreateConversationRequest(BaseModel):
     conversationId: str | None = None
+    initialChat: str | None = None
 
 @chat_conversation_route.post("/create-conversation")
 async def create_new_conversation(request: CreateConversationRequest | None = None, _ = Depends(get_authenticated_user), userid: Annotated[str | None, Header()] = None):
@@ -99,6 +100,9 @@ async def create_new_conversation(request: CreateConversationRequest | None = No
     if not userid:
         return {"error": "Missing userid header"}
     
+    if not request.initialChat:
+        return {"error": "Missing initialChat in request body"}
+    
     print(f"  🔹 Auth check: {(time.time() - start)*1000:.0f}ms")
     
     # Use provided ID or generate a new one
@@ -107,13 +111,14 @@ async def create_new_conversation(request: CreateConversationRequest | None = No
     print(f"  🔹 UUID gen: {(time.time() - t1)*1000:.0f}ms")
     
     t2 = time.time()
-    await db_manager.create_conversation(conversation_id, userid)
+    await db_manager.create_conversation(conversation_id, request.initialChat, userid)
     print(f"  🔹 DB create: {(time.time() - t2)*1000:.0f}ms")
     
     print(f"  ✅ Total: {(time.time() - start)*1000:.0f}ms")
     
     return {
         "conversationId": conversation_id,
+        "initialChat": request.initialChat,
         "userId": userid
     }
 
@@ -148,29 +153,37 @@ async def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], 
     # Convert to the expected API response format
     response = []
     for conv in conversations:
-        # Get the first message from the conversation to use as title
-        conv_graph_val = (await graph.aget_state(config={"configurable": {"thread_id": conv.id}})).values
-        conv_graph_messages = conv_graph_val.get("messages", []) if conv_graph_val else []
-        title = "New Conversation"  # Default title
+        title = "New Conversation"
 
-        if conv_graph_messages:
-            first_message = conv_graph_messages[0]
-            content = first_message.content
+        # Try to get from database title first
+        if title == "New Conversation" and conv.title:
+            title = conv.title
 
-            # Extract text from various content formats
-            if isinstance(content, list) and len(content) > 0:
-                # Handle list format (e.g., [{"type": "text", "text": "..."}])
-                for item in content:
-                    if isinstance(item, dict) and item.get('type') == 'text':
-                        title = item.get('text', '').strip()
-                        break
-            elif isinstance(content, str):
-                # Handle simple string format
-                title = content.strip()
-            
-            # Truncate long titles and add ellipsis
-            if len(title) > 50:
-                title = title[:50] + "..."
+        # Get title from first message in LangGraph state if still default
+        if title == "New Conversation":
+            # Get the first message from the conversation to use as title
+            conv_graph_val = (await graph.aget_state(config={"configurable": {"thread_id": conv.id}})).values
+            conv_graph_messages = conv_graph_val.get("messages", []) if conv_graph_val else []
+            title = "New Conversation"  # Default title
+
+            if conv_graph_messages:
+                first_message = conv_graph_messages[0]
+                content = first_message.content
+
+                # Extract text from various content formats
+                if isinstance(content, list) and len(content) > 0:
+                    # Handle list format (e.g., [{"type": "text", "text": "..."}])
+                    for item in content:
+                        if isinstance(item, dict) and item.get('type') == 'text':
+                            title = item.get('text', '').strip()
+                            break
+                elif isinstance(content, str):
+                    # Handle simple string format
+                    title = content.strip()
+                
+                # Truncate long titles and add ellipsis
+                if len(title) > 50:
+                    title = title[:50] + "..."
 
         response.append({
             "id": conv.id,

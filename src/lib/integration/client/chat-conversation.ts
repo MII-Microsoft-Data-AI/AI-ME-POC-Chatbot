@@ -142,13 +142,13 @@ export const TogglePinConversation = async (conversationId: string) => {
   return true
 }
 
-export const CreateConversation = async (conversationId: string) => {
+export const CreateConversation = async (conversationId: string, initialChat: string) => {
   const response = await fetch(`${BaseAPIPath}/create-conversation`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ conversationId }),
+    body: JSON.stringify({ conversationId, initialChat }),
   });
   
   if (!response.ok) {
