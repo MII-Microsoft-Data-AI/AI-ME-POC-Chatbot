@@ -3,13 +3,95 @@
 
 import json
 import uuid
+import typing
 
 from typing import List
 from langgraph.graph.state import CompiledStateGraph
 from langchain_core.messages import AIMessageChunk, AIMessage, ToolMessage, HumanMessage
 
 
-DEBUG_STREAM = False
+DEBUG_STREAM = True
+
+
+async def handle_tool_message(msg: ToolMessage):
+    """
+    Handle ToolMessage - processes tool results and yields ToolCallResult (a:) chunks
+    """
+    tool_call_id = msg.tool_call_id
+    print(f"  🛠️ Received tool result for {tool_call_id}")
+    try:
+        # Ensure result is JSON serializable
+        result_content = msg.content
+        if isinstance(result_content, str) and len(result_content) > 10000:
+            # Truncate very long results to prevent stream issues
+            result_content = result_content[:10000] + "\n\n... (truncated)"
+            print(f"  ⚠️ Tool result truncated (original length: {len(msg.content)})")
+        
+        # Create the payload - json.dumps will handle all escaping
+        payload = {'toolCallId': tool_call_id, 'result': result_content}
+        payload_json = json.dumps(payload)
+        
+        print(f"  📤 Sending tool result for {tool_call_id}: {len(result_content)} chars")
+        yield f"a:{payload_json}\n"
+        
+    except Exception as tool_error:
+        print(f"  ❌ Error sending tool result: {tool_error}")
+        import traceback
+        traceback.print_exc()
+        # Send error message instead
+        error_payload = json.dumps({'toolCallId': tool_call_id, 'isError': True, 'result': f'Error: {str(tool_error)}'})
+        yield f"a:{error_payload}\n"
+
+
+async def handle_ai_message(msg: typing.Union[AIMessage, AIMessageChunk], tool_calls_by_idx: dict, tool_calls: dict, accumulated_text: str, token_count: int):
+    """
+    Handle AIMessage/AIMessageChunk - processes text content and tool calls
+    Returns tuple of (accumulated_text, token_count)
+    """
+    # Handle text content - TextDelta (0:)
+    if msg.content:
+        # Send text delta - properly escape the content
+        content = str(msg.content)
+        yield f"0:{json.dumps(content)}\n"
+        accumulated_text += content
+        token_count += len(content.split())
+
+    # Handle tool calls
+    if hasattr(msg, 'tool_calls') and msg.tool_calls:
+        for tool_call in msg.tool_calls:
+            tool_call_id = tool_call.get('id', str(uuid.uuid4()))
+            tool_name = tool_call.get('name', '')
+
+            if tool_name == "":
+                continue
+
+            tool_calls_by_idx[len(tool_calls_by_idx)] = tool_call_id
+            tool_calls[tool_call_id] = {"name": tool_name, "args": ""}
+            
+            # Send StartToolCall (b:)
+            print(f"  📤 Sending tool call start: {tool_name} ({tool_call_id})")
+            yield f"b:{json.dumps({'toolCallId': tool_call_id, 'toolName': tool_name})}\n"
+            
+            # Send tool args immediately if available
+            tool_args = tool_call.get('args', {})
+            if tool_args:
+                # Convert args dict to JSON string for argsTextDelta
+                args_str = json.dumps(tool_args) if isinstance(tool_args, dict) else str(tool_args)
+                print(f"  📤 Sending tool args: {len(args_str)} chars")
+                yield f"c:{json.dumps({'toolCallId': tool_call_id, 'argsTextDelta': args_str})}\n"
+    
+    # Handle streaming tool call chunks
+    if hasattr(msg, 'tool_call_chunks') and msg.tool_call_chunks:
+        for chunk in msg.tool_call_chunks:
+            tool_name = chunk.get("name", "")
+            args_chunk = chunk.get("args", "")
+            chunk_index = chunk.get("index", 0)
+            tool_call_id = tool_calls_by_idx.get(chunk_index, -1)
+
+            # Accumulate args and send ToolCallArgsTextDelta (c:)
+            if tool_call_id != -1 and args_chunk:
+                tool_calls[tool_call_id]["args"] += args_chunk
+                yield f"c:{json.dumps({'toolCallId': tool_call_id, 'argsTextDelta': args_chunk})}\n"
 
 async def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMessage], conversation_id: str):
     # Generate unique message ID
@@ -36,81 +118,21 @@ async def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMe
         ):
             if DEBUG_STREAM:
                 print(f"\n--- Streamed Message Chunk #{stream_msg_count} ---")
+                print("type:", type(msg))
                 print("msg:", msg)
                 print("metadata:", metadata)
                 stream_msg_count += 1
             try:
                 if isinstance(msg, ToolMessage):
-                    # Handle tool results - ToolCallResult (a:)
-                    tool_call_id = msg.tool_call_id
-                    try:
-                        # Ensure result is JSON serializable
-                        result_content = msg.content
-                        if isinstance(result_content, str) and len(result_content) > 10000:
-                            # Truncate very long results to prevent stream issues
-                            result_content = result_content[:10000] + "\n\n... (truncated)"
-                            print(f"  ⚠️ Tool result truncated (original length: {len(msg.content)})")
-                        
-                        # Create the payload - json.dumps will handle all escaping
-                        payload = {'toolCallId': tool_call_id, 'result': result_content}
-                        payload_json = json.dumps(payload)
-                        
-                        print(f"  📤 Sending tool result for {tool_call_id}: {len(result_content)} chars")
-                        yield f"a:{payload_json}\n"
-                        
-                    except Exception as tool_error:
-                        print(f"  ❌ Error sending tool result: {tool_error}")
-                        import traceback
-                        traceback.print_exc()
-                        # Send error message instead
-                        error_payload = json.dumps({'toolCallId': tool_call_id, 'isError': True, 'result': f'Error: {str(tool_error)}'})
-                        yield f"a:{error_payload}\n"
+                    async for chunk in handle_tool_message(msg):
+                        yield chunk
 
                 elif isinstance(msg, AIMessageChunk) or isinstance(msg, AIMessage):
-                    # Handle text content - TextDelta (0:)
-                    if msg.content:
-                        # Send text delta - properly escape the content
-                        content = str(msg.content)
-                        yield f"0:{json.dumps(content)}\n"
-                        accumulated_text += content
-                        token_count += len(content.split())
-
-                    # Handle tool calls
-                    if hasattr(msg, 'tool_calls') and msg.tool_calls:
-                        for tool_call in msg.tool_calls:
-                            tool_call_id = tool_call.get('id', str(uuid.uuid4()))
-                            tool_name = tool_call.get('name', '')
-
-                            if tool_name == "":
-                                continue
-
-                            tool_calls_by_idx[len(tool_calls_by_idx)] = tool_call_id
-                            tool_calls[tool_call_id] = {"name": tool_name, "args": ""}
-                            
-                            # Send StartToolCall (b:)
-                            print(f"  📤 Sending tool call start: {tool_name} ({tool_call_id})")
-                            yield f"b:{json.dumps({'toolCallId': tool_call_id, 'toolName': tool_name})}\n"
-                            
-                            # Send tool args immediately if available
-                            tool_args = tool_call.get('args', {})
-                            if tool_args:
-                                # Convert args dict to JSON string for argsTextDelta
-                                args_str = json.dumps(tool_args) if isinstance(tool_args, dict) else str(tool_args)
-                                print(f"  📤 Sending tool args: {len(args_str)} chars")
-                                yield f"c:{json.dumps({'toolCallId': tool_call_id, 'argsTextDelta': args_str})}\n"
-                    
-                    # Handle streaming tool call chunks
-                    if hasattr(msg, 'tool_call_chunks') and msg.tool_call_chunks:
-                        for chunk in msg.tool_call_chunks:
-                            tool_name = chunk.get("name", "")
-                            args_chunk = chunk.get("args", "")
-                            chunk_index = chunk.get("index", 0)
-                            tool_call_id = tool_calls_by_idx.get(chunk_index, -1)
-
-                            # Accumulate args and send ToolCallArgsTextDelta (c:)
-                            if tool_call_id != -1 and args_chunk:
-                                tool_calls[tool_call_id]["args"] += args_chunk
-                                yield f"c:{json.dumps({'toolCallId': tool_call_id, 'argsTextDelta': args_chunk})}\n"
+                    async for chunk in handle_ai_message(msg, tool_calls_by_idx, tool_calls, accumulated_text, token_count):
+                        if isinstance(chunk, tuple):
+                            accumulated_text, token_count = chunk
+                        else:
+                            yield chunk
             except GeneratorExit:
                 # Client disconnected, stop processing
                 return
