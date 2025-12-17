@@ -1,10 +1,15 @@
+# You can find the parsing on
+# node_modules/assistant-stream/src/core/serialization/data-stream/chunk-types.ts
+
 import json
 import uuid
-from langchain_core.messages import AIMessageChunk, AIMessage, ToolMessage, HumanMessage
-
-from langgraph.graph.state import CompiledStateGraph
 
 from typing import List
+from langgraph.graph.state import CompiledStateGraph
+from langchain_core.messages import AIMessageChunk, AIMessage, ToolMessage, HumanMessage
+
+
+DEBUG_STREAM = False
 
 async def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMessage], conversation_id: str):
     # Generate unique message ID
@@ -21,14 +26,19 @@ async def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMe
     tool_calls_by_idx = {}
     accumulated_text = ""
     token_count = 0
-
+    if DEBUG_STREAM:
+        stream_msg_count = 0
     try:
         async for msg, metadata in graph.astream(
             {"messages": input_message},
             config={"configurable": {"thread_id": conversation_id}},
             stream_mode="messages",
         ):
-            
+            if DEBUG_STREAM:
+                print(f"\n--- Streamed Message Chunk #{stream_msg_count} ---")
+                print("msg:", msg)
+                print("metadata:", metadata)
+                stream_msg_count += 1
             try:
                 if isinstance(msg, ToolMessage):
                     # Handle tool results - ToolCallResult (a:)
@@ -53,7 +63,7 @@ async def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMe
                         import traceback
                         traceback.print_exc()
                         # Send error message instead
-                        error_payload = json.dumps({'toolCallId': tool_call_id, 'result': f'Error: {str(tool_error)}'})
+                        error_payload = json.dumps({'toolCallId': tool_call_id, 'isError': True, 'result': f'Error: {str(tool_error)}'})
                         yield f"a:{error_payload}\n"
 
                 elif isinstance(msg, AIMessageChunk) or isinstance(msg, AIMessage):
