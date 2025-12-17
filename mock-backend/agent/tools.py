@@ -324,7 +324,7 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
             
             image_url = result.data[0].url
             print(f"  ✅ Image generated: {image_url}")
-            return f"Use this image URL and change it to markdow to show the image. Image generated link: {image_url}"
+            return image_url
             
         except Exception as e:
             error_msg = f"Error generating image: {str(e)}"
