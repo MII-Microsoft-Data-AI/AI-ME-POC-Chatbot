@@ -95,7 +95,7 @@ async def upload_file(
         blob_client.upload_blob(file_content, overwrite=True)
         
         # Create file metadata in database
-        file_metadata = db_manager.create_file(
+        file_metadata = await db_manager.create_file(
             file_id=file_id,
             userid=userid,
             filename=file.filename,
@@ -111,12 +111,12 @@ async def upload_file(
             )
             
             # Update file metadata with workflow ID
-            db_manager.update_file_workflow_id(file_id, workflow_id)
+            await db_manager.update_file_workflow_id(file_id, userid, workflow_id)
             logger.info(f"Started indexing workflow for file {file_id}, workflow_id: {workflow_id}")
         except Exception as e:
             logger.error(f"Failed to start indexing workflow: {str(e)}")
             # Update status to failed
-            db_manager.update_file_status(file_id, "failed", f"Failed to start indexing: {str(e)}")
+            await db_manager.update_file_status(file_id, userid, "failed", f"Failed to start indexing: {str(e)}")
         
         return FileUploadResponse(
             file_id=file_id,
@@ -132,14 +132,14 @@ async def upload_file(
         raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
 @file_indexing_route.get("/files", response_model=FileListResponse)
-def list_files(credentials: HTTPBasicCredentials = Depends(security), userid:  Annotated[str | None, Header()] = None,):
+async def list_files(credentials: HTTPBasicCredentials = Depends(security), userid:  Annotated[str | None, Header()] = None,):
     """List all files for the authenticated user with real-time workflow status."""
     try:
         if not userid:
             raise HTTPException(status_code=400, detail="Missing userid header")
         
         # Get user files from database
-        files = db_manager.get_user_files(userid)
+        files = await db_manager.get_user_files(userid)
         
         # Update status for files with workflow IDs
         updated_files = []
@@ -163,7 +163,7 @@ def list_files(credentials: HTTPBasicCredentials = Depends(security), userid:  A
                     
                     # Update database if status changed
                     if new_status != file_metadata.status:
-                        db_manager.update_file_status(file_metadata.file_id, new_status, new_error)
+                        await db_manager.update_file_status(file_metadata.file_id, userid, new_status, new_error)
                         file_metadata.status = new_status
                         file_metadata.error_message = new_error
                         
@@ -182,7 +182,7 @@ def list_files(credentials: HTTPBasicCredentials = Depends(security), userid:  A
         raise HTTPException(status_code=500, detail=f"Failed to list files: {str(e)}")
 
 @file_indexing_route.get("/files/{file_id}", response_model=FileMetadata)
-def get_file_status(
+async def get_file_status(
     file_id: str,
     credentials: HTTPBasicCredentials = Depends(security),
     userid:  Annotated[str | None, Header()] = None,
@@ -194,7 +194,7 @@ def get_file_status(
             raise HTTPException(status_code=400, detail="Missing userid header")
         
         # Get file metadata
-        file_metadata = db_manager.get_file(file_id)
+        file_metadata = await db_manager.get_file(file_id, userid)
         if not file_metadata:
             raise HTTPException(status_code=404, detail="File not found")
         
@@ -211,16 +211,16 @@ def get_file_status(
                 # Map workflow status to file status
                 if workflow_status.get('status') == 'running':
                     if file_metadata.status != 'in_progress':
-                        db_manager.update_file_status(file_id, 'in_progress')
+                        await db_manager.update_file_status(file_id, userid, 'in_progress')
                         file_metadata.status = 'in_progress'
                 elif workflow_status.get('status') == 'completed':
                     if file_metadata.status != 'completed':
-                        db_manager.update_file_status(file_id, 'completed')
+                        await db_manager.update_file_status(file_id, userid, 'completed')
                         file_metadata.status = 'completed'
                 elif workflow_status.get('status') == 'failed':
                     error_msg = workflow_status.get('error', 'Workflow failed')
                     if file_metadata.status != 'failed':
-                        db_manager.update_file_status(file_id, 'failed', error_msg)
+                        await db_manager.update_file_status(file_id, userid, 'failed', error_msg)
                         file_metadata.status = 'failed'
                         file_metadata.error_message = error_msg
                         
@@ -250,7 +250,7 @@ async def delete_file(
         user_id = userid
 
         # Get file metadata
-        file_metadata = db_manager.get_file(file_id)
+        file_metadata = await db_manager.get_file(file_id, user_id)
         if not file_metadata:
             raise HTTPException(status_code=404, detail="File not found")
         
@@ -290,7 +290,7 @@ async def delete_file(
             logger.warning(f"Failed to delete blob: {str(e)}")
         
         # Delete from database
-        success = db_manager.delete_file(file_id, user_id)
+        success = await db_manager.delete_file(file_id, user_id)
         
         if success:
             return FileDeleteResponse(
@@ -321,7 +321,7 @@ async def reindex_file(
         user_id = userid
         
         # Get file metadata
-        file_metadata = db_manager.get_file(file_id)
+        file_metadata = await db_manager.get_file(file_id, user_id)
         if not file_metadata:
             raise HTTPException(status_code=404, detail="File not found")
         
@@ -330,7 +330,7 @@ async def reindex_file(
             raise HTTPException(status_code=403, detail="Access denied")
         
         # Reset status to pending
-        db_manager.update_file_status(file_id, "pending")
+        await db_manager.update_file_status(file_id, user_id, "pending")
         
         # Start indexing workflow
         orchestrator = get_orchestrator()
@@ -340,7 +340,7 @@ async def reindex_file(
         )
         
         # Update file metadata with new workflow ID
-        db_manager.update_file_workflow_id(file_id, workflow_id)
+        await db_manager.update_file_workflow_id(file_id, user_id, workflow_id)
         logger.info(f"Started re-indexing workflow for file {file_id}, workflow_id: {workflow_id}")
         
         return {
@@ -357,7 +357,7 @@ async def reindex_file(
         raise HTTPException(status_code=500, detail=f"Failed to start re-indexing: {str(e)}")
 
 @file_indexing_route.get("/files/{file_id}/workflow-status")
-def get_workflow_status(
+async def get_workflow_status(
     file_id: str,
     credentials: HTTPBasicCredentials = Depends(security),
     userid:  Annotated[str | None, Header()] = None,
@@ -370,7 +370,7 @@ def get_workflow_status(
         user_id = userid
         
         # Get file metadata
-        file_metadata = db_manager.get_file(file_id)
+        file_metadata = await db_manager.get_file(file_id, user_id)
         if not file_metadata:
             raise HTTPException(status_code=404, detail="File not found")
         
@@ -413,7 +413,7 @@ def get_workflow_status(
         raise HTTPException(status_code=500, detail=f"Failed to get workflow status: {str(e)}")
     
 @file_indexing_route.get("/chunk/{chunk_id}", response_model=ChunkDetailResponse)
-def get_chunk_detail(
+async def get_chunk_detail(
     chunk_id: str,
     credentials: HTTPBasicCredentials = Depends(security),
     userid: Annotated[str | None, Header()] = None,
@@ -450,7 +450,7 @@ def get_chunk_detail(
             raise HTTPException(status_code=404, detail="File ID not found in chunk metadata")
         
         # Get file metadata from database
-        file_metadata = db_manager.get_file(file_id)
+        file_metadata = await db_manager.get_file(file_id, user_id)
         if not file_metadata:
             raise HTTPException(status_code=404, detail="File not found")
         
