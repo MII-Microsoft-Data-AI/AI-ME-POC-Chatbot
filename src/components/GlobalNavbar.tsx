@@ -140,28 +140,24 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
   return (
     <>
       {/* Mobile Top Bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-xl border-b border-[#f0f0f0] px-4 py-3 flex items-center justify-between shadow-sm w-screen">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-zinc-100/50 px-3 py-2 flex items-center gap-3">
         <button
           onClick={() => setIsMobileSidebarOpen(true)}
-          className="p-2 -ml-2 rounded-md hover:bg-[#f5f5f5] transition-colors text-[#5f5f5f]"
+          className="p-2 -ml-2 rounded-md hover:bg-zinc-100 transition-colors text-zinc-500"
           title="Open menu"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
+          <PanelLeft className="w-5 h-5" strokeWidth={1.5} />
         </button>
 
-        <div className="flex-1 flex justify-center items-center">
-          <h1 className="text-sm font-semibold text-[#2d2d2d] truncate max-w-[200px]">
+        <button 
+           onClick={() => setIsMobileSidebarOpen(true)}
+           className="flex items-center gap-2 px-2 py-1.5 -ml-1 hover:bg-zinc-100 rounded-lg transition-colors overflow-hidden"
+        >
+          <span className="font-medium text-sm text-zinc-700 truncate max-w-[200px]">
             {getMobileTitle()}
-          </h1>
-        </div>
-
-        <div className="w-10 flex justify-end">
-           <button onClick={handleNewChat} className="p-2 rounded-md hover:bg-[#f5f5f5] text-[#5f5f5f]">
-             <SquarePen className="w-5 h-5" strokeWidth={1.5} />
-           </button>
-        </div>
+          </span>
+          <ChevronsUpDown className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" strokeWidth={1.5} />
+        </button>
       </div>
 
       {/* Mobile Sidebar Overlay */}

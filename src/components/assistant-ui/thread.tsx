@@ -71,7 +71,7 @@ export const Thread: FC<ThreadProps> = ({ isLoading = false, isCreating = false,
     <LazyMotion features={domAnimation}>
       <MotionConfig reducedMotion="user">
         <ThreadPrimitive.Root
-          className="aui-root aui-thread-root @container flex h-full flex-col bg-zinc-50/50"
+          className="aui-root aui-thread-root @container flex h-full flex-col bg-white"
           style={{
             ["--thread-max-width" as string]: "48rem",
           }}
@@ -119,18 +119,26 @@ const ThreadWelcomeSuggestions: FC = () => {
     }
   
     return (
-      <div className="w-full max-w-4xl mt-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 px-2">
+      <div className="w-full max-w-4xl">
+        <div className="flex overflow-x-auto snap-x gap-2.5 px-2 pb-2 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible sm:pb-0 scrollbar-hide">
             {config.chat.recommendationQuestions.slice(0, 4).map((question, index) => (
                 <button
                     key={index}
                     onClick={() => handleSuggestionClick(question)}
-                    className="flex h-full flex-col justify-between rounded-xl bg-white p-4 text-left transition-all hover:bg-zinc-50 shadow-sm hover:shadow-md border border-zinc-200"
+                    className="flex-none min-w-[calc(50%-5px)] snap-start flex h-full flex-col justify-between rounded-lg bg-white p-3 text-left transition-all hover:bg-zinc-50 shadow-sm hover:shadow border border-zinc-200"
                 >
-                    <span className="text-sm font-medium text-gray-700 line-clamp-3">{question}</span>
-                    <div className="mt-4 flex w-full justify-end">
-                        <div className="rounded-full bg-white p-1.5 shadow-sm">
-                            <MessageSquare className="h-3 w-3 text-gray-400" />
+                    <span className="text-sm font-normal text-gray-700 line-clamp-2 md:line-clamp-3 leading-snug">{question}</span>
+                    <div className="mt-2 md:mt-3 flex w-full justify-end">
+                        <div 
+                            className="rounded-full p-1.5"
+                            style={{ 
+                                backgroundColor: `${settings.primaryColor}15`
+                            }}
+                        >
+                            <MessageSquare 
+                                className="h-3.5 w-3.5" 
+                                style={{ color: settings.primaryColor }}
+                            />
                         </div>
                     </div>
                 </button>
@@ -153,15 +161,15 @@ const ThreadWelcome: FC<{ mode?: ChatMode; onModeChange?: (mode: ChatMode) => vo
         
         <div className="flex flex-col items-center justify-center space-y-8 mt-12">
             {/* Badge */}
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-2 mt-12 md:mt-0">
                 <div 
-                    className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                    className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors text-center max-w-[90vw] truncate"
                     style={{ 
                         backgroundColor: `${settings.primaryColor}15`, 
                         color: settings.primaryColor 
                     }}
                 >
-                    Powered by • <span className="underline cursor-pointer font-semibold">PT Mitra Integrasi Informatika</span>
+                    Powered by • <span className="underline cursor-pointer font-semibold">PT Mitra Integrasi Informatika - Azure AI Team</span>
                 </div>
             </div>
 
@@ -170,7 +178,7 @@ const ThreadWelcome: FC<{ mode?: ChatMode; onModeChange?: (mode: ChatMode) => vo
                  <h1 className="text-4xl font-serif text-[#2d2d2d]">
                     Good {time}, {userName}
                  </h1>
-                 <p className="text-base text-zinc-500 font-light max-w-xl pt-2">
+                 <p className="hidden md:block text-base text-zinc-500 font-light max-w-xl pt-2">
                     Your dedicated intelligent partner for innovation. Experience the power of enterprise-grade AI designed to elevate your productivity and streamline your workflow.
                  </p>
             </div>
@@ -227,9 +235,9 @@ const Composer: FC<ComposerProps> = ({ isDisabled = false, isCreating = false, m
         {/* Actions Footer */}
         <div className="flex items-center justify-between px-3 pb-3 pt-1">
            <div className="flex items-center gap-2">
-             <ComposerAddAttachment />
+             {mode === 'image' && <ComposerAddAttachment />}
              {onModeChange && (
-                  <ModeSelector mode={mode} onModeChange={onModeChange} />
+                  <ModeSelector mode={mode} onModeChange={onModeChange} primaryColor={settings.primaryColor} />
               )}
            </div>
            
