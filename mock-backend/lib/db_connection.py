@@ -1,52 +1,76 @@
-"""Database connection factory - supports both SQLite and PostgreSQL."""
+"""Database connection factory - Azure Cosmos DB."""
 import os
-from typing import Any, Optional
-from contextlib import asynccontextmanager
-import asyncpg
-import aiosqlite
+from typing import Optional
+from azure.cosmos.aio import CosmosClient
+from azure.cosmos import PartitionKey
 
-class DatabaseConnection:
-    """Async database connection manager."""
+class CosmosDBConnection:
+    """Async Cosmos DB connection manager."""
     
     def __init__(self):
-        self.use_postgres = os.getenv("USE_POSTGRES", "false").lower() == "true"
-        self.postgres_url = os.getenv("POSTGRES_URL")
-        self.sqlite_path = os.getenv("DB_PATH_CHATBOT", "mock.db")
+        # Cosmos DB configuration from environment variables
+        self.endpoint = os.getenv("COSMOS_ENDPOINT")
+        self.key = os.getenv("COSMOS_KEY")
+        self.database_name = os.getenv("COSMOS_DATABASE_NAME", "chatbot-db")
         
-        # Connection pool for PostgreSQL
-        self._pg_pool: Optional[asyncpg.Pool] = None
+        # Container names
+        self.conversations_container = "conversations"
+        self.files_container = "files"
+        
+        # Client instance
+        self._client: Optional[CosmosClient] = None
+        self._database = None
+        self._conversations_container = None
+        self._files_container = None
     
-    async def init_postgres_pool(self):
-        """Initialize PostgreSQL connection pool."""
-        if self.use_postgres and not self._pg_pool:
-            self._pg_pool = await asyncpg.create_pool(
-                self.postgres_url,
-                min_size=2,
-                max_size=10,
-                command_timeout=60
-            )
-            print("✅ PostgreSQL connection pool initialized")
-    
-    async def close_postgres_pool(self):
-        """Close PostgreSQL connection pool."""
-        if self._pg_pool:
-            await self._pg_pool.close()
-            print("🔌 PostgreSQL connection pool closed")
-    
-    @asynccontextmanager
-    async def get_connection(self):
-        """Get database connection (PostgreSQL or SQLite)."""
-        if self.use_postgres:
-            if not self._pg_pool:
-                await self.init_postgres_pool()
+    async def init_cosmos_client(self):
+        """Initialize Cosmos DB client and containers."""
+        if not self._client:
+            if not self.endpoint or not self.key:
+                raise ValueError("COSMOS_ENDPOINT and COSMOS_KEY must be set in environment variables")
             
-            async with self._pg_pool.acquire() as conn:
-                yield conn
-        else:
-            # SQLite connection
-            async with aiosqlite.connect(self.sqlite_path) as conn:
-                conn.row_factory = aiosqlite.Row
-                yield conn
+            self._client = CosmosClient(self.endpoint, self.key)
+            
+            # Create database if not exists
+            self._database = await self._client.create_database_if_not_exists(id=self.database_name)
+            
+            # Create conversations container with userid as partition key
+            self._conversations_container = await self._database.create_container_if_not_exists(
+                id=self.conversations_container,
+                partition_key=PartitionKey(path="/userid")
+            )
+            
+            # Create files container with userid as partition key
+            self._files_container = await self._database.create_container_if_not_exists(
+                id=self.files_container,
+                partition_key=PartitionKey(path="/userid")
+            )
+            
+            print("✅ Cosmos DB client initialized")
+            print(f"   Database: {self.database_name}")
+            print(f"   Containers: {self.conversations_container}, {self.files_container}")
+    
+    async def close_cosmos_client(self):
+        """Close Cosmos DB client."""
+        if self._client:
+            await self._client.close()
+            self._client = None
+            self._database = None
+            self._conversations_container = None
+            self._files_container = None
+            print("🔌 Cosmos DB client closed")
+    
+    def get_conversations_container(self):
+        """Get conversations container."""
+        if not self._conversations_container:
+            raise RuntimeError("Cosmos DB client not initialized. Call init_cosmos_client() first.")
+        return self._conversations_container
+    
+    def get_files_container(self):
+        """Get files container."""
+        if not self._files_container:
+            raise RuntimeError("Cosmos DB client not initialized. Call init_cosmos_client() first.")
+        return self._files_container
 
 # Global database connection instance
-db_connection = DatabaseConnection()
+db_connection = CosmosDBConnection()

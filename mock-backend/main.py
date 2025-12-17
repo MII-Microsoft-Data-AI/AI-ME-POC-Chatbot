@@ -55,18 +55,10 @@ async def startup_event():
     """Initialize expensive resources at startup."""
     print("🚀 Initializing application...")
     
-    # Initialize database connection pool
+    # Initialize Cosmos DB client
     from lib.db_connection import db_connection
-    if db_connection.use_postgres:
-        print("🐘 Initializing PostgreSQL connection pool...")
-        await db_connection.init_postgres_pool()
-    else:
-        print("📁 Using SQLite database")
-    
-    # Run migrations
-    print("🔄 Running database migrations...")
-    from migrations.migrate import run_migrations
-    await run_migrations()
+    print("🌐 Initializing Cosmos DB client...")
+    await db_connection.init_cosmos_client()
     
     # Initialize LangGraph
     print("🤖 Initializing LangGraph...")
@@ -79,9 +71,8 @@ async def startup_event():
 async def shutdown_event():
     """Cleanup resources on shutdown."""
     from lib.db_connection import db_connection
-    if db_connection.use_postgres:
-        print("🔌 Closing PostgreSQL connection pool...")
-        await db_connection.close_postgres_pool()
+    print("🔌 Closing Cosmos DB client...")
+    await db_connection.close_cosmos_client()
 
 @app.get("/")
 async def root(username: Annotated[str, Depends(get_authenticated_user)]):
