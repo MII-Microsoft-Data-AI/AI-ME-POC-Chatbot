@@ -86,6 +86,15 @@ async def handle_ai_message(msg: typing.Union[AIMessage, AIMessageChunk], tool_c
             tool_name = chunk.get("name", "")
             args_chunk = chunk.get("args", "")
             chunk_index = chunk.get("index", 0)
+            chunk_id = chunk.get("id")  # ID is only present on the FIRST chunk of a new tool call
+            
+            # If this chunk has an ID, it's the start of a NEW tool call - update the index mapping
+            if chunk_id:
+                tool_calls_by_idx[chunk_index] = chunk_id
+                if chunk_id not in tool_calls:
+                    tool_calls[chunk_id] = {"name": tool_name or "", "args": ""}
+                print(f"  📤 New tool call detected at index {chunk_index}: {chunk_id}")
+            
             tool_call_id = tool_calls_by_idx.get(chunk_index, -1)
 
             # Accumulate args and send ToolCallArgsTextDelta (c:)
@@ -99,7 +108,10 @@ async def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMe
     
     try:
         # Send StartStep (f:) - Start of message processing
-        yield f"f:{json.dumps({'messageId': message_id})}\n"
+        chunk = f"f:{json.dumps({'messageId': message_id})}\n"
+        if DEBUG_STREAM:
+            print(f"  📤 SENDING CHUNK: {chunk.strip()}")
+        yield chunk
     except (GeneratorExit, Exception) as e:
         print(f"Error sending start step: {e}")
         return
@@ -108,6 +120,7 @@ async def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMe
     tool_calls_by_idx = {}
     accumulated_text = ""
     token_count = 0
+    
     if DEBUG_STREAM:
         stream_msg_count = 0
     try:
@@ -125,6 +138,8 @@ async def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMe
             try:
                 if isinstance(msg, ToolMessage):
                     async for chunk in handle_tool_message(msg):
+                        if DEBUG_STREAM:
+                            print(f"  📤 SENDING CHUNK: {chunk.strip()}")
                         yield chunk
 
                 elif isinstance(msg, AIMessageChunk) or isinstance(msg, AIMessage):
@@ -132,6 +147,8 @@ async def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMe
                         if isinstance(chunk, tuple):
                             accumulated_text, token_count = chunk
                         else:
+                            if DEBUG_STREAM:
+                                print(f"  📤 SENDING CHUNK: {chunk.strip()}")
                             yield chunk
             except GeneratorExit:
                 # Client disconnected, stop processing
@@ -144,7 +161,10 @@ async def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMe
 
         # Send FinishMessage (d:) with usage stats
         try:
-            yield f"d:{json.dumps({'finishReason': 'stop', 'usage': {'promptTokens': token_count, 'completionTokens': token_count}})}\n"
+            chunk = f"d:{json.dumps({'finishReason': 'stop', 'usage': {'promptTokens': token_count, 'completionTokens': token_count}})}\n"
+            if DEBUG_STREAM:
+                print(f"  📤 SENDING CHUNK: {chunk.strip()}")
+            yield chunk
         except (GeneratorExit, Exception) as e:
             print(f"Error sending finish message: {e}")
             return
