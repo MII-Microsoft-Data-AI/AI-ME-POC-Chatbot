@@ -35,6 +35,30 @@ class DatabaseManager:
     
     def __init__(self):
         pass
+
+    async def rename_conversation(self, conversation_id: str, userid: str, new_title: str) -> bool:
+        """Rename a conversation."""
+        container = db_connection.get_conversations_container()
+        
+        try:
+            # Read the item first
+            item = await container.read_item(
+                item=conversation_id,
+                partition_key=userid
+            )
+            
+            # Update the title field
+            item['title'] = new_title
+
+            # Replace the item
+            await container.replace_item(
+                item=conversation_id,
+                body=item
+            )
+            
+            return True
+        except CosmosResourceNotFoundError:
+            return False
     
     async def create_conversation(self, conversation_id: str, title: str, userid: str) -> ConversationMetadata:
         """Create a new conversation metadata entry."""
@@ -74,7 +98,8 @@ class DatabaseManager:
                 id=item['id'],
                 userid=item['userid'],
                 is_pinned=item['is_pinned'],
-                created_at=item['created_at']
+                created_at=item['created_at'],
+                title=item.get('title', None)
             )
         except CosmosResourceNotFoundError:
             return None

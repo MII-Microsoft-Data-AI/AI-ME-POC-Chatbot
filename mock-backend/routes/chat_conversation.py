@@ -322,3 +322,29 @@ async def pin_conversation(_: Annotated[str, Depends(get_authenticated_user)], u
     
     action = "pinned" if updated else "unpinned"
     return {"message": f"Conversation {action} successfully"}
+
+class RenameConversationRequest(BaseModel):
+    new_title: str | None = None
+
+@chat_conversation_route.post("/conversations/{conversation_id}/rename")
+async def rename_conversation(_: Annotated[str, Depends(get_authenticated_user)],request: RenameConversationRequest, userid: Annotated[str | None, Header()] = None, conversation_id: str = ""):
+    """Rename a conversation."""
+
+    if not userid:
+        return {"error": "Missing userid header"}
+    
+    new_title = request.new_title
+    if not new_title:
+        return {"error": "Missing new_title in request body"}
+
+    existing_data = await db_manager.get_conversation(conversation_id, userid)
+    if not existing_data:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Rename the conversation in the database
+    updated = await db_manager.rename_conversation(conversation_id, userid, new_title)
+    
+    if not updated:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    return {"message": "Conversation renamed successfully"}
