@@ -1,7 +1,7 @@
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import { AnimatedImage } from "../animated-image";
 import { useState, useEffect } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, TriangleAlert } from "lucide-react";
 
 type GenerateImageArgs = {
   prompt: string
@@ -53,15 +53,50 @@ const ImageGenerationLoading = () => {
   );
 };
 
+const ImageGenerationFailed = () => {
+  return (
+    <div className="relative w-full max-w-md aspect-video rounded-2xl overflow-hidden border bg-destructive/5 shadow-sm">
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <div className="relative">
+          <div className="absolute inset-0 rounded-full bg-destructive/20 blur-lg" />
+          <div className="relative bg-card rounded-full p-3 border shadow-sm">
+            <TriangleAlert className="w-6 h-6 text-destructive" />
+          </div>
+        </div>
+        
+        <div className="space-y-1 z-10">
+          <p className="text-sm font-semibold text-destructive">
+            Image Generation Failed
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Please try again later.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const GenerateImageUI = makeAssistantToolUI<GenerateImageArgs, GenerateImageResult>({
   toolName: "generate_image", // Must match backend tool name
-  render: ({ result }) => {
+  render: ({ result, status }) => {
     // Tool outputs stream in; `result` will be `undefined` until the tool resolves.
-    if (result === undefined) {
+
+    if (status.type == 'complete') {
+      return <AnimatedImage
+        src={result}
+      />
+    }
+
+    if (status.type === 'running') {
       return <ImageGenerationLoading />;
     }
-    return <AnimatedImage
-      src={result}
-    />
+
+    if (status.type === 'incomplete' || status.type == 'requires-action') {
+      return <ImageGenerationFailed />;
+    }
+
+    return <></>
+
   },
 })
