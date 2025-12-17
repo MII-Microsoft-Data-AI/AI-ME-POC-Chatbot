@@ -6,188 +6,20 @@ import Image from "next/image"
 import { useRouter, usePathname } from "next/navigation"
 import { useChat } from "@/contexts/ChatContext"
 import { useModal } from "@/contexts/ModalContext"
-import MenuButton from "./MenuButton"
 import Logo from "./Logo"
 import ChatSearch from "./ChatSearch"
 import ChatSkeleton from "./ChatSkeleton"
 import { getPageTitle } from "@/lib/site-config"
 import { getPersonalizedSiteConfig } from "@/lib/personalized-config"
 import { usePersonalizationContext } from "@/contexts/PersonalizationContext"
-import { SquarePen, PanelRightClose, PanelRightOpen, Pin, Trash2, MessageSquare, PanelLeft, Plus, MoreHorizontal, Star, Pencil, Settings, Globe, HelpCircle, LogOut, ChevronRight, Download, CircleArrowUp, Info, ChevronsUpDown, Database } from "lucide-react"
+import { SquarePen, PanelRightClose, PanelLeft, Plus, Settings, LogOut, ChevronsUpDown, Database } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ChatGroup } from "@/components/features/chat/ChatGroup"
+import { motion, AnimatePresence } from "framer-motion"
 
 interface GlobalNavbarProps {
   user: User
 }
-
-// Helper component to render chat group sections
-interface ChatGroupProps {
-  title: string
-  chats: { id: string; title: string; date: string; createdAt: number; isPinned: boolean }[]
-  onChatClick: (chatId: string) => void
-  onTogglePin?: (chatId: string) => Promise<void>
-  onDeleteChat?: (chatId: string) => Promise<void>
-  isCollapsed?: boolean
-  isMobile?: boolean
-}
-
-function ChatGroup({ title, chats, onChatClick, onTogglePin, onDeleteChat, isCollapsed = false, isMobile = false }: ChatGroupProps) {
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
-  const { settings } = usePersonalizationContext()
-  const siteConfig = getPersonalizedSiteConfig(settings)
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (activeMenuId && !(event.target as Element).closest('.chat-menu-trigger')) {
-        setActiveMenuId(null)
-      }
-    }
-    document.addEventListener('click', handleClickOutside)
-    return () => document.removeEventListener('click', handleClickOutside)
-  }, [activeMenuId])
-
-  if (chats.length === 0) return null
-
-  if (isCollapsed) {
-    return (
-      <div className="space-y-1">
-        {chats.map((chat) => (
-          <div key={chat.id} className="relative group px-2">
-            <button
-              onClick={() => onChatClick(chat.id)}
-              className={cn(
-                "w-full h-9 flex items-center justify-center rounded-md hover:bg-[#ececec] transition-colors relative",
-                "text-[#5f5f5f] hover:text-[#2d2d2d]"
-              )}
-              title={chat.title}
-            >
-              <MessageSquare className="w-5 h-5" strokeWidth={1.5} />
-              {chat.isPinned && (
-                <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full border border-white" style={{ backgroundColor: siteConfig.primaryColor || '#d97757' }}></div>
-              )}
-            </button>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  return (
-    <div className="mb-6 last:mb-2">
-      {title && (
-        <h3 className="text-xs font-medium text-[#787878] mb-2 px-3 flex items-center select-none"
-          style={{ color: title === "Pinned" ? (siteConfig.primaryColor || '#d97757') : undefined }}
-        >
-          {title}
-        </h3>
-      )}
-      <div className="space-y-[2px]">
-        {chats.map((chat) => (
-          <div key={chat.id} className="group relative">
-            <button
-              className={cn(
-                "w-full flex items-center justify-between px-3 py-2 rounded-md transition-colors text-left",
-                "hover:bg-[#ececec] group/item pr-9" // Added padding-right to avoid overlap with menu button
-              )}
-              onClick={() => onChatClick(chat.id)}
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <div className="min-w-0 flex-1">
-                  <p className={cn(
-                    "text-sm font-normal truncate transition-colors",
-                    "text-[#2d2d2d]"
-                  )}>
-                    {chat.title}
-                  </p>
-                </div>
-              </div>
-            </button>
-            
-            {/* Menu Trigger Button */}
-            <div className={cn(
-               "absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity chat-menu-trigger",
-               activeMenuId === chat.id && "opacity-100"
-            )}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setActiveMenuId(activeMenuId === chat.id ? null : chat.id)
-                }}
-                className="p-1 rounded-md hover:bg-[#dcdcdc] text-[#5f5f5f] transition-colors"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Dropdown Menu */}
-            <AnimatePresence>
-              {activeMenuId === chat.id && (
-                 <motion.div
-                   initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                   exit={{ opacity: 0, scale: 0.95 }}
-                   transition={{ duration: 0.1 }}
-                   className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 overflow-hidden py-1"
-                 >
-                    {onTogglePin && (
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation()
-                          await onTogglePin(chat.id)
-                          setActiveMenuId(null)
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f5] flex items-center gap-2"
-                      >
-                         <Star 
-                           className={cn("w-4 h-4", chat.isPinned ? "" : "text-[#5f5f5f]")} 
-                           style={chat.isPinned ? { fill: siteConfig.primaryColor || '#d97757', color: siteConfig.primaryColor || '#d97757' } : undefined}
-                         />
-                         <span>{chat.isPinned ? "Unstar" : "Star"}</span>
-                      </button>
-                    )}
-                    
-                    <button
-                        onClick={(e) => {
-                           e.stopPropagation()
-                           // rename logic placeholder
-                           setActiveMenuId(null)
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f5] flex items-center gap-2"
-                    >
-                         <Pencil className="w-4 h-4 text-[#5f5f5f]" />
-                         <span>Rename</span>
-                    </button>
-
-                    {onDeleteChat && (
-                      <>
-                        <div className="h-px bg-gray-100 my-1"></div>
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation()
-                            await onDeleteChat(chat.id)
-                            setActiveMenuId(null)
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-[#ffeaea] flex items-center gap-2"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          <span>Delete</span>
-                        </button>
-                      </>
-                    )}
-                 </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-import { motion, AnimatePresence } from "framer-motion"
-
-// ... existing imports ...
-// We need to keep the imports but I will rewrite the whole component return to use motion
 
 export default function GlobalNavbar({ user }: GlobalNavbarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
@@ -243,9 +75,10 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
     const chat = allChats.find(c => c.id === chatId)
     if (chat) {
       showConfirmation({
-        chatId,
-        chatTitle: chat.title,
-        message: `Are you sure you want to delete "${chat.title}"? This action cannot be undone.`,
+        title: "Delete chat",
+        message: `Are you sure you want to delete "${chat.title}"?`,
+        chatId: chatId,
+        confirmButtonText: "Delete",
         onConfirm: () => deleteChat(chatId)
       })
     }
@@ -307,14 +140,14 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
   return (
     <>
       {/* Mobile Top Bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-xl border-b border-[#e5e5e5] px-4 py-3 flex items-center justify-between shadow-sm w-screen">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-xl border-b border-[#f0f0f0] px-4 py-3 flex items-center justify-between shadow-sm w-screen">
         <button
           onClick={() => setIsMobileSidebarOpen(true)}
-          className="p-2 -ml-2 rounded-md hover:bg-[#f0f0f0] transition-colors text-[#5f5f5f]"
+          className="p-2 -ml-2 rounded-md hover:bg-[#f5f5f5] transition-colors text-[#5f5f5f]"
           title="Open menu"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
 
@@ -325,8 +158,8 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
         </div>
 
         <div className="w-10 flex justify-end">
-           <button onClick={handleNewChat} className="p-2 rounded-md hover:bg-[#f0f0f0] text-[#5f5f5f]">
-             <SquarePen className="w-5 h-5" />
+           <button onClick={handleNewChat} className="p-2 rounded-md hover:bg-[#f5f5f5] text-[#5f5f5f]">
+             <SquarePen className="w-5 h-5" strokeWidth={1.5} />
            </button>
         </div>
       </div>
@@ -350,13 +183,13 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="fixed inset-y-0 left-0 w-[280px] bg-[#f9f9f9] flex flex-col z-50 md:hidden shadow-2xl"
             >
-              <div className="flex-shrink-0 p-4 flex items-center justify-between border-b border-[#e5e5e5] bg-white">
+              <div className="flex-shrink-0 p-4 flex items-center justify-between border-b border-[#f0f0f0] bg-white">
                 <Logo showText={true} />
                 <button
                   onClick={() => setIsMobileSidebarOpen(false)}
-                  className="p-2 hover:bg-[#f0f0f0] rounded-md transition-colors text-[#5f5f5f]"
+                  className="p-2 hover:bg-[#f5f5f5] rounded-md transition-colors text-[#5f5f5f]"
                 >
-                  <PanelRightClose className="w-5 h-5" />
+                  <PanelRightClose className="w-5 h-5" strokeWidth={1.5} />
                 </button>
               </div>
 
@@ -367,7 +200,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                     className="w-full text-white py-2.5 px-4 rounded-lg flex items-center justify-center space-x-2 transition-colors mb-4 shadow-sm hover:opacity-90"
                     style={{ backgroundColor: siteConfig.primaryColor || '#3b82f6' }}
                   >
-                    <SquarePen className="w-4 h-4" />
+                    <SquarePen className="w-4 h-4" strokeWidth={1.5} />
                     <span className="font-medium text-sm">New Chat</span>
                   </button>
 
@@ -390,12 +223,12 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                 </div>
               </div>
 
-              <div className="flex-shrink-0 p-4 bg-white border-t border-[#e5e5e5]">
+              <div className="flex-shrink-0 p-4 bg-white border-t border-[#f0f0f0]">
                  <div className="flex items-center gap-3">
                     {user.image ? (
                       <Image src={user.image} alt={user.name || 'User'} width={32} height={32} className="w-8 h-8 rounded-full" />
                     ) : (
-                      <div className="w-8 h-8 bg-[#f0f0f0] rounded-full flex items-center justify-center text-[#5f5f5f]">
+                      <div className="w-8 h-8 bg-[#f5f5f5] rounded-full flex items-center justify-center text-[#5f5f5f]">
                         <span className="text-xs font-bold">{user.name?.[0] || 'U'}</span>
                       </div>
                     )}
@@ -404,7 +237,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                       <p className="text-xs text-[#787878] truncate">{user.email}</p>
                     </div>
                     <button onClick={handleSignOut} className="text-[#5f5f5f] hover:text-[#2d2d2d] p-1">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                     </button>
                  </div>
               </div>
@@ -419,7 +252,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
         animate={isCollapsed ? "collapsed" : "expanded"}
         variants={sidebarVariants}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="hidden md:flex h-screen flex-col border-r border-[#e5e5e5] bg-[#ffffff] relative z-30 overflow-hidden"
+        className="hidden md:flex h-screen flex-col border-r border-[#f0f0f0] bg-[#ffffff] relative z-30 overflow-hidden"
       >
         {/* Header */}
         <div className="flex-shrink-0 min-h-[60px] flex items-center justify-between px-3 pt-3 pb-2">
@@ -436,7 +269,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
             {/* Collapse button - always in the same position */}
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-2 rounded-md text-[#5f5f5f] hover:bg-[#ececec] hover:text-[#2d2d2d] transition-colors flex-shrink-0"
+              className="p-2 rounded-md text-[#5f5f5f] hover:bg-[#f5f5f5] hover:text-[#2d2d2d] transition-colors flex-shrink-0"
             >
               <div className="relative w-5 h-5">
                  <motion.div
@@ -444,14 +277,14 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                     transition={{ duration: 0.3 }}
                     className="absolute inset-0"
                  >
-                    <PanelLeft className="w-5 h-5" />
+                    <PanelLeft className="w-5 h-5" strokeWidth={1.5} />
                  </motion.div>
                  <motion.div
                     animate={{ rotate: isCollapsed ? -180 : 0, opacity: isCollapsed ? 0 : 1, scale: isCollapsed ? 0 : 1 }}
                     transition={{ duration: 0.3 }}
                     className="absolute inset-0"
                  >
-                    <PanelLeft className="w-5 h-5" />
+                    <PanelLeft className="w-5 h-5" strokeWidth={1.5} />
                  </motion.div>
               </div>
             </button>
@@ -463,8 +296,8 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
             className={cn(
               "flex items-center rounded-lg transition-colors cursor-pointer",
               isCollapsed 
-                ? "w-9 h-9 justify-center bg-transparent hover:bg-[#ececec] mx-auto" 
-                : "w-full py-2 px-2 bg-[#f0f0f0] hover:bg-[#e6e6e6]"
+                ? "w-9 h-9 justify-center bg-transparent hover:bg-[#f5f5f5] mx-auto" 
+                : "w-full py-2 px-2 bg-transparent hover:bg-[#f5f5f5]"
              )} 
              onClick={handleNewChat}
           >
@@ -492,7 +325,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
              opacity: isCollapsed ? 0 : 1,
              marginBottom: isCollapsed ? 0 : 8 // pb-2
            }}
-           className="px-3 overflow-hidden"
+           className={cn("px-3", isCollapsed ? "overflow-hidden" : "overflow-visible")}
         >
            <ChatSearch isCollapsed={false} />
         </motion.div>
@@ -525,7 +358,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
         </div>
 
         {/* Footer / User Profile */}
-        <div className="flex-shrink-0 border-t border-[#e5e5e5] bg-[#ffffff] relative profile-menu-container">
+        <div className="flex-shrink-0 border-t border-[#f0f0f0] bg-[#ffffff] relative profile-menu-container">
            <AnimatePresence>
              {showProfileMenu && (
                <>
@@ -560,7 +393,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                              className="w-full text-left px-4 py-2 hover:bg-[#f5f5f5] flex items-center justify-between text-[#2d2d2d]"
                         >
                            <div className="flex items-center gap-3">
-                              <Plus className="w-4 h-4 text-[#5f5f5f]" />
+                              <Plus className="w-4 h-4 text-[#5f5f5f]" strokeWidth={1.5} />
                               <span>New chat</span>
                            </div>
                         </button>
@@ -577,7 +410,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                             className="w-full text-left px-4 py-2 hover:bg-[#f5f5f5] flex items-center justify-between text-[#2d2d2d]"
                         >
                            <div className="flex items-center gap-3">
-                              <Settings className="w-4 h-4 text-[#5f5f5f]" />
+                              <Settings className="w-4 h-4 text-[#5f5f5f]" strokeWidth={1.5} />
                               <span>Settings</span>
                            </div>
                         </button>
@@ -588,7 +421,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                             }}
                             className="w-full text-left px-4 py-2 hover:bg-[#f5f5f5] flex items-center gap-3 text-[#2d2d2d]"
                         >
-                           <Database className="w-4 h-4 text-[#5f5f5f]" />
+                           <Database className="w-4 h-4 text-[#5f5f5f]" strokeWidth={1.5} />
                            <span>Resource Management</span>
                         </button>
                     </div>
@@ -600,7 +433,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                          onClick={handleSignOut}
                          className="w-full text-left px-4 py-2 hover:bg-[#f5f5f5] flex items-center gap-3 text-[#2d2d2d]"
                        >
-                           <LogOut className="w-4 h-4 text-[#5f5f5f]" />
+                           <LogOut className="w-4 h-4 text-[#5f5f5f]" strokeWidth={1.5} />
                            <span>Log out</span>
                        </button>
                     </div>
@@ -612,7 +445,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
            <div className={cn("p-2 space-y-1", isCollapsed && "flex justify-center")}>
               <div 
                 className={cn(
-                  "flex items-center rounded-md hover:bg-[#f0f0f0] transition-colors cursor-pointer group relative",
+                  "flex items-center rounded-md hover:bg-[#f5f5f5] transition-colors cursor-pointer group relative",
                   isCollapsed ? "w-9 h-9 justify-center" : "py-2 px-2"
                 )}
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -620,7 +453,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                   {/* Avatar - always in the same position */}
                   <div className="flex-shrink-0">
                       {user.image ? (
-                      <Image src={user.image} alt={user.name!} width={32} height={32} className="w-8 h-8 rounded-full border border-[#e5e5e5]" />
+                      <Image src={user.image} alt={user.name!} width={32} height={32} className="w-8 h-8 rounded-full border border-[#f0f0f0]" />
                       ) : (
                       <div className="w-8 h-8 rounded-full bg-[#3b82f6] flex items-center justify-center text-white text-xs font-bold">
                           {user.email?.[0].toUpperCase()}
@@ -639,7 +472,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                   {/* Chevron icon - only shown when expanded */}
                   {!isCollapsed && (
                       <div className="flex-shrink-0 ml-auto">
-                         <ChevronsUpDown className="w-4 h-4 text-[#9e9e9e]" />
+                         <ChevronsUpDown className="w-4 h-4 text-[#9e9e9e]" strokeWidth={1.5} />
                       </div>
                   )}
               </div>

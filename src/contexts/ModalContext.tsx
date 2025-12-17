@@ -4,19 +4,25 @@ import { createContext, useContext, useState, ReactNode } from 'react'
 
 interface ConfirmationAlert {
   isOpen: boolean
-  chatId: string | null
-  chatTitle: string
+  title: string
   message: string
+  chatId?: string | null // Keep for backward compatibility/specific logic if needed
   onConfirm?: () => void
+  confirmButtonText?: string
+  cancelButtonText?: string
+  type?: 'danger' | 'info' | 'warning'
 }
 
 interface ModalContextType {
   confirmationAlert: ConfirmationAlert
   showConfirmation: (options: {
-    chatId: string
-    chatTitle: string
+    title: string
     message: string
+    chatId?: string // Optional now
     onConfirm: () => void
+    confirmButtonText?: string
+    cancelButtonText?: string
+    type?: 'danger' | 'info' | 'warning'
   }) => void
   hideConfirmation: () => void
   confirmAction: () => void
@@ -39,35 +45,39 @@ interface ModalProviderProps {
 export function ModalProvider({ children }: ModalProviderProps) {
   const [confirmationAlert, setConfirmationAlert] = useState<ConfirmationAlert>({
     isOpen: false,
-    chatId: null,
-    chatTitle: '',
+    title: '',
     message: '',
-    onConfirm: undefined
+    chatId: null,
+    onConfirm: undefined,
+    type: 'danger'
   })
 
   const showConfirmation = (options: {
-    chatId: string
-    chatTitle: string
+    title: string
     message: string
+    chatId?: string
     onConfirm: () => void
+    confirmButtonText?: string
+    cancelButtonText?: string
+    type?: 'danger' | 'info' | 'warning'
   }) => {
     setConfirmationAlert({
       isOpen: true,
-      chatId: options.chatId,
-      chatTitle: options.chatTitle,
+      title: options.title,
       message: options.message,
-      onConfirm: options.onConfirm
+      chatId: options.chatId || null,
+      onConfirm: options.onConfirm,
+      confirmButtonText: options.confirmButtonText,
+      cancelButtonText: options.cancelButtonText,
+      type: options.type || 'danger'
     })
   }
 
   const hideConfirmation = () => {
-    setConfirmationAlert({
-      isOpen: false,
-      chatId: null,
-      chatTitle: '',
-      message: '',
-      onConfirm: undefined
-    })
+    setConfirmationAlert(prev => ({
+      ...prev,
+      isOpen: false
+    }))
   }
 
   const confirmAction = () => {

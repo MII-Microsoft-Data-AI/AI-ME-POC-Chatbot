@@ -2,59 +2,74 @@
 
 import { useModal } from "@/contexts/ModalContext"
 import { useRouter, usePathname } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
+import { Button } from "@/components/ui/button"
 
 export default function ConfirmationModal() {
   const { confirmationAlert, hideConfirmation, confirmAction } = useModal()
   const router = useRouter()
   const pathname = usePathname()
 
-  if (!confirmationAlert.isOpen) return null
-
   const handleConfirm = () => {
     const chatId = confirmationAlert.chatId
     confirmAction()
     
-    // If user is currently viewing the deleted chat, redirect to main chat page
     if (chatId && pathname === `/chat/${chatId}`) {
       router.push('/chat')
     }
   }
 
   return (
-    <div className="fixed inset-0 bg-transparent bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-        <div className="flex items-center mb-4">
-          <div className="flex-shrink-0 w-10 h-10 mx-auto bg-red-100 rounded-full flex items-center justify-center">
-            <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-        </div>
-        
-        <div className="text-center">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Delete Chat
-          </h3>
-          <p className="text-sm text-gray-500 mb-6">
-            {confirmationAlert.message}
-          </p>
-        </div>
-        
-        <div className="flex space-x-3">
-          <button
+    <AnimatePresence>
+      {confirmationAlert.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             onClick={hideConfirmation}
-            className="flex-1 bg-white border border-gray-300 rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+          />
+          
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="bg-white rounded-2xl shadow-xl w-full max-w-[400px] overflow-hidden relative z-50 flex flex-col"
           >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            className="flex-1 bg-red-600 border border-transparent rounded-md px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-          >
-            Delete
-          </button>
+            <div className="p-6 text-center">
+              <h3 className="text-xl font-bold text-[#2d2d2d] mb-2">
+                {confirmationAlert.title}
+              </h3>
+              <p className="text-[#6b7280] text-[15px] leading-relaxed">
+                {confirmationAlert.message}
+              </p>
+            </div>
+            
+            <div className="p-4 pt-0 flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={hideConfirmation}
+                className="flex-1 border-[#e5e5e5] text-[#2d2d2d] hover:bg-[#f5f5f5]"
+              >
+                {confirmationAlert.cancelButtonText || 'Cancel'}
+              </Button>
+              <Button
+                variant={confirmationAlert.type === 'info' ? 'default' : 'destructive'}
+                onClick={handleConfirm}
+                className={`flex-1 ${
+                  confirmationAlert.type === 'info' 
+                    ? 'bg-blue-600 hover:bg-blue-700' 
+                    : 'bg-[#cf533d] hover:bg-[#b94a36]'
+                }`}
+              >
+                {confirmationAlert.confirmButtonText || 'Delete'}
+              </Button>
+            </div>
+          </motion.div>
         </div>
-      </div>
-    </div>
+      )}
+    </AnimatePresence>
   )
 }

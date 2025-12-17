@@ -1,0 +1,83 @@
+/Users/mbprom4pro/core/github.com/metrodata/chatbot-poc/AI-ME-POC-Chatbot/mock-backend/.venv/lib/python3.12/site-packages/azure/search/documents/indexes/_generated/models/_models_py3.py:5644: SyntaxWarning: invalid escape sequence '\W'
+  pattern: str = "\W+",
+/Users/mbprom4pro/core/github.com/metrodata/chatbot-poc/AI-ME-POC-Chatbot/mock-backend/.venv/lib/python3.12/site-packages/azure/search/documents/indexes/_generated/models/_models_py3.py:5869: SyntaxWarning: invalid escape sequence '\W'
+  pattern: str = "\W+",
+INFO:     Started server process [39706]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+Orchestrator started
+🌐 Initializing SearxNG with URL: https://searxng.kaenova.my.id
+  ✅ web_search tool loaded successfully
+✓ Tools loaded. Tools available: ['get_current_time', 'Python_REPL', 'web_search', 'azure_search_documents', 'azure_search_semantic', 'azure_search_filter', 'azure_search_vector']
+🚀 Initializing application...
+🐘 Initializing PostgreSQL connection pool...
+✅ PostgreSQL connection pool initialized
+🔄 Running database migrations...
+🔄 Running 2 migrations...
+  📄 Applying 001_create_conversations.sql...
+  ✅ 001_create_conversations.sql applied
+  📄 Applying 002_create_files.sql...
+  ✅ 002_create_files.sql applied
+✅ All migrations completed
+🤖 Initializing LangGraph...
+✅ Checkpointer initialized and cached
+✅ LangGraph initialized and cached
+✅ Server ready
+⏱️  [POST] /create-conversation - START
+  🔹 Auth check: 0ms
+  🔹 UUID gen: 0ms
+  🔹 DB create: 168ms
+  ✅ Total: 168ms
+⏱️  [POST] /create-conversation - DONE in 0.170s
+INFO:     ::1:0 - "POST /create-conversation HTTP/1.1" 200 OK
+⏱️  [GET] /conversations/b0429c09-246d-4eb4-a1bb-9e290dec8e8b - START
+⏱️  [GET] /conversations/b0429c09-246d-4eb4-a1bb-9e290dec8e8b - DONE in 0.081s
+INFO:     ::1:0 - "GET /conversations/b0429c09-246d-4eb4-a1bb-9e290dec8e8b HTTP/1.1" 200 OK
+⏱️  [POST] /conversations/b0429c09-246d-4eb4-a1bb-9e290dec8e8b/chat - START
+⏱️  [POST] /conversations/b0429c09-246d-4eb4-a1bb-9e290dec8e8b/chat - DONE in 0.048s
+INFO:     ::1:0 - "POST /conversations/b0429c09-246d-4eb4-a1bb-9e290dec8e8b/chat HTTP/1.1" 200 OK
+⏱️  [GET] /conversations - START
+⏱️  [GET] /conversations - DONE in 0.089s
+INFO:     ::1:0 - "GET /conversations HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: POST https://foundry-poc-chatbot.openai.azure.com/openai/deployments/gpt-5-mini/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
+INFO:azure.core.pipeline.policies.http_logging_policy:Request URL: 'https://ai-ml-aisearch.search.windows.net/indexes('poc-chatbot')/docs/search.post.search?api-version=REDACTED'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '76'
+    'api-key': 'REDACTED'
+    'Accept': 'application/json;odata.metadata=none'
+    'x-ms-client-request-id': '06a8a254-da9c-11f0-b7d3-dd707447d4f4'
+    'User-Agent': 'azsdk-python-search-documents/11.5.3 Python/3.12.11 (macOS-26.2-arm64-arm-64bit)'
+A body is sent with the request
+INFO:azure.core.pipeline.policies.http_logging_policy:Response status: 200
+Response headers:
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/json; odata.metadata=none; odata.streaming=true; charset=utf-8'
+    'Content-Encoding': 'REDACTED'
+    'Vary': 'REDACTED'
+    'Strict-Transport-Security': 'REDACTED'
+    'Preference-Applied': 'REDACTED'
+    'OData-Version': 'REDACTED'
+    'request-id': '06a8a254-da9c-11f0-b7d3-dd707447d4f4'
+    'elapsed-time': 'REDACTED'
+    'Date': 'Tue, 16 Dec 2025 16:26:52 GMT'
+INFO:httpx:HTTP Request: POST https://foundry-poc-chatbot.openai.azure.com/openai/deployments/gpt-5-mini/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
+🔍 Text search: query='latest trends in web development 2025', top=5
+  ✅ Total results found: 0
+⏱️  [GET] /conversations - START
+⏱️  [GET] /conversations - DONE in 0.129s
+INFO:     ::1:0 - "GET /conversations HTTP/1.1" 200 OK
+⏱️  [GET] /conversations - START
+⏱️  [GET] /conversations - DONE in 0.101s
+INFO:     ::1:0 - "GET /conversations HTTP/1.1" 200 OK
+⏱️  [GET] /conversations - START
+⏱️  [GET] /conversations - DONE in 0.053s
+INFO:     ::1:0 - "GET /conversations HTTP/1.1" 200 OK
+⏱️  [GET] /conversations - START
+⏱️  [GET] /conversations - DONE in 0.056s
+INFO:     ::1:0 - "GET /conversations HTTP/1.1" 200 OK
+⏱️  [GET] /conversations - START
+⏱️  [GET] /conversations - DONE in 0.050s
+INFO:     ::1:0 - "GET /conversations HTTP/1.1" 200 OK
