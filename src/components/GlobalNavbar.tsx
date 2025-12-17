@@ -223,8 +223,97 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                 </div>
               </div>
 
+              <AnimatePresence>
+                {showProfileMenu && (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-50 bg-transparent"
+                      onClick={() => setShowProfileMenu(false)}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                      transition={{ duration: 0.2 }}
+                      className="fixed bottom-[76px] bg-white rounded-xl shadow-2xl border border-gray-100 z-[100] overflow-hidden text-sm"
+                      style={{ 
+                        left: '12px',
+                        width: '256px' // 280px sidebar - 24px margins
+                      }}
+                    >
+                      <div className="px-4 py-3 border-b border-gray-100">
+                          <p className="text-[#6e6e6e] truncate font-medium">{user.email}</p>
+                      </div>
+                      
+                      <div className="py-1">
+                          <button 
+                                onClick={() => {
+                                    handleNewChat()
+                                    setShowProfileMenu(false)
+                                    setIsMobileSidebarOpen(false)
+                                }}
+                                className="w-full text-left px-4 py-2 hover:bg-[#f5f5f5] flex items-center justify-between text-[#2d2d2d]"
+                          >
+                            <div className="flex items-center gap-3">
+                                <Plus className="w-4 h-4 text-[#5f5f5f]" strokeWidth={1.5} />
+                                <span>New chat</span>
+                            </div>
+                          </button>
+                      </div>
+
+                      <div className="h-px bg-gray-100 my-1"></div>
+
+                      <div className="py-1">
+                          <button 
+                              onClick={() => {
+                                  router.push('/settings')
+                                  setShowProfileMenu(false)
+                                  setIsMobileSidebarOpen(false)
+                              }}
+                              className="w-full text-left px-4 py-2 hover:bg-[#f5f5f5] flex items-center justify-between text-[#2d2d2d]"
+                          >
+                            <div className="flex items-center gap-3">
+                                <Settings className="w-4 h-4 text-[#5f5f5f]" strokeWidth={1.5} />
+                                <span>Settings</span>
+                            </div>
+                          </button>
+                          <button 
+                              onClick={() => {
+                                  router.push('/resource-management')
+                                  setShowProfileMenu(false)
+                                  setIsMobileSidebarOpen(false)
+                              }}
+                              className="w-full text-left px-4 py-2 hover:bg-[#f5f5f5] flex items-center gap-3 text-[#2d2d2d]"
+                          >
+                            <Database className="w-4 h-4 text-[#5f5f5f]" strokeWidth={1.5} />
+                            <span>Resource Management</span>
+                          </button>
+                      </div>
+
+                      <div className="h-px bg-gray-100 my-1"></div>
+
+                      <div className="py-1">
+                        <button 
+                          onClick={handleSignOut}
+                          className="w-full text-left px-4 py-2 hover:bg-[#f5f5f5] flex items-center gap-3 text-[#2d2d2d]"
+                        >
+                            <LogOut className="w-4 h-4 text-[#5f5f5f]" strokeWidth={1.5} />
+                            <span>Log out</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+
               <div className="flex-shrink-0 p-4 bg-white border-t border-[#f0f0f0]">
-                 <div className="flex items-center gap-3">
+                <button
+                   onClick={() => setShowProfileMenu(!showProfileMenu)}
+                   className="flex items-center gap-3 w-full hover:bg-[#f5f5f5] p-2 -m-2 rounded-lg transition-colors"
+                 >
                     {user.image ? (
                       <Image src={user.image} alt={user.name || 'User'} width={32} height={32} className="w-8 h-8 rounded-full" />
                     ) : (
@@ -232,14 +321,12 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                         <span className="text-xs font-bold">{user.name?.[0] || 'U'}</span>
                       </div>
                     )}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 text-left">
                       <p className="text-sm font-medium text-[#2d2d2d] truncate">{user.name}</p>
                       <p className="text-xs text-[#787878] truncate">{user.email}</p>
                     </div>
-                    <button onClick={handleSignOut} className="text-[#5f5f5f] hover:text-[#2d2d2d] p-1">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                    </button>
-                 </div>
+                    <ChevronsUpDown className="w-4 h-4 text-[#9e9e9e]" strokeWidth={1.5} />
+                 </button>
               </div>
             </motion.div>
           </>

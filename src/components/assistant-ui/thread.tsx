@@ -22,9 +22,13 @@ import {
   Loader2,
   MessageSquare,
   Image,
+  History,
+  Plus,
+  Paperclip,
 } from "lucide-react";
 import type { FC } from "react";
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 
 import {
   ComposerAddAttachment,
@@ -61,27 +65,25 @@ interface ThreadProps {
 }
 
 export const Thread: FC<ThreadProps> = ({ isLoading = false, isCreating = false, mode = 'chat', onModeChange }) => {
-
-
+  const isThreadEmpty = useAssistantState(({ thread }) => thread.messages.length === 0);
 
   return (
     <LazyMotion features={domAnimation}>
       <MotionConfig reducedMotion="user">
         <ThreadPrimitive.Root
-          className="aui-root aui-thread-root @container flex h-full flex-col bg-background"
+          className="aui-root aui-thread-root @container flex h-full flex-col bg-zinc-50/50"
           style={{
-            ["--thread-max-width" as string]: "50rem",
+            ["--thread-max-width" as string]: "48rem",
           }}
         >
-          <ThreadPrimitive.Viewport className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4">
+          <ThreadPrimitive.Viewport className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-4 pt-10">
             {
               !isLoading &&
-            <ThreadWelcome mode={mode} onModeChange={onModeChange} />
+              <ThreadWelcome mode={mode} onModeChange={onModeChange} isCreating={isCreating} />
             }
 
             {isLoading ? (
-              // Blank state while loading
-              null
+               null
             ) : (
               <ThreadPrimitive.Messages
                 components={{
@@ -92,10 +94,13 @@ export const Thread: FC<ThreadProps> = ({ isLoading = false, isCreating = false,
               />
             )}
             
-            <ThreadPrimitive.If empty={isLoading}>
-              <div className="aui-thread-viewport-spacer min-h-8 grow" />
-            </ThreadPrimitive.If>
-            <Composer isDisabled={isLoading} isCreating={isCreating} mode={mode} onModeChange={onModeChange} />
+            <div className="flex-grow min-h-4" />
+
+            {!isThreadEmpty && !isLoading && (
+               <div className="sticky bottom-0 z-10 bg-background pb-4 pt-2">
+                  <Composer isDisabled={isLoading} isCreating={isCreating} mode={mode} onModeChange={onModeChange} />
+               </div>
+            )}
           </ThreadPrimitive.Viewport>
         </ThreadPrimitive.Root>
       </MotionConfig>
@@ -103,263 +108,170 @@ export const Thread: FC<ThreadProps> = ({ isLoading = false, isCreating = false,
   );
 };
 
-const ThreadScrollToBottom: FC = () => {
-  return (
-    <ThreadPrimitive.ScrollToBottom asChild>
-      <TooltipIconButton
-        tooltip="Scroll to bottom"
-        variant="outline"
-        className="aui-thread-scroll-to-bottom absolute -top-12 z-10 self-center rounded-full p-4 disabled:invisible dark:bg-background dark:hover:bg-accent"
-      >
-        <ArrowDownIcon />
-      </TooltipIconButton>
-    </ThreadPrimitive.ScrollToBottom>
-  );
-};
+const ThreadWelcomeSuggestions: FC = () => {
+    const { settings } = usePersonalizationContext()
+    const config = getPersonalizedSiteConfig(settings)
+    const threadRuntime = useThreadRuntime()
+  
+    const handleSuggestionClick = (action: string) => {
+      threadRuntime.composer.setText(action)
+      threadRuntime.composer.send()
+    }
+  
+    return (
+      <div className="w-full max-w-4xl mt-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 px-2">
+            {config.chat.recommendationQuestions.slice(0, 4).map((question, index) => (
+                <button
+                    key={index}
+                    onClick={() => handleSuggestionClick(question)}
+                    className="flex h-full flex-col justify-between rounded-xl bg-white p-4 text-left transition-all hover:bg-zinc-50 shadow-sm hover:shadow-md border border-zinc-200"
+                >
+                    <span className="text-sm font-medium text-gray-700 line-clamp-3">{question}</span>
+                    <div className="mt-4 flex w-full justify-end">
+                        <div className="rounded-full bg-white p-1.5 shadow-sm">
+                            <MessageSquare className="h-3 w-3 text-gray-400" />
+                        </div>
+                    </div>
+                </button>
+            ))}
+        </div>
+      </div>
+    );
+  };
 
-const ThreadWelcome: FC<{ mode?: ChatMode; onModeChange?: (mode: ChatMode) => void }> = ({ mode = 'chat', onModeChange }) => {
+const ThreadWelcome: FC<{ mode?: ChatMode; onModeChange?: (mode: ChatMode) => void; isCreating?: boolean }> = ({ mode = 'chat', onModeChange, isCreating }) => {
   const { settings } = usePersonalizationContext()
   const config = getPersonalizedSiteConfig(settings)
   const time = getTimeOfDay()
+  const { data: session } = useSession()
+  const userName = session?.user?.name || "User"
 
   return (
     <ThreadPrimitive.Empty>
-      <div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-[var(--thread-max-width)] flex-grow flex-col">
-        <div className="aui-thread-welcome-center flex w-full flex-grow flex-col items-center justify-center">
-          <div className="aui-thread-welcome-message flex size-full flex-col justify-center px-8">
-            <m.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="aui-thread-welcome-message-motion-1 text-2xl font-semibold text-primary"
-            >
-              {config.chat.greeting[time]}
-            </m.div>
-            <m.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ delay: 0.1 }}
-              className="aui-thread-welcome-message-motion-2 text-2xl text-muted-foreground/65"
-            >
-              {config.chat.welcomeMessage}
-            </m.div>
-            
-            {/* Mode Selection Cards */}
-            {onModeChange && (
-              <m.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-                transition={{ delay: 0.2 }}
-                className="mt-8 w-full max-w-md"
-              >
-                <p className="text-sm text-muted-foreground mb-3">What would you like to do?</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Chat Mode Card */}
-                  <button
-                    onClick={() => onModeChange('chat')}
-                    className={cn(
-                      "flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 bg-white transition-all hover:bg-gray-50",
-                       mode === 'chat' && "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
-                    )}
-                  >
-                    <div className={cn("p-2 rounded-lg bg-gray-100", mode === 'chat' && "bg-primary/10")}>
-                        <MessageSquare className={cn("w-6 h-6 text-gray-500", mode === 'chat' && "text-primary")} strokeWidth={1.5} />
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">Chat</span>
-                    <span className="text-xs text-muted-foreground text-center">Have a conversation</span>
-                  </button>
-                  
-                  {/* Image Generation Mode Card */}
-                  <button
-                    onClick={() => onModeChange('image')}
-                    className={cn(
-                      "flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-200 bg-white transition-all hover:bg-gray-50",
-                      mode === 'image' && "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
-                    )}
-                  >
-                     <div className={cn("p-2 rounded-lg bg-gray-100", mode === 'image' && "bg-primary/10")}>
-                        <Image className={cn("w-6 h-6 text-gray-500", mode === 'image' && "text-primary")} strokeWidth={1.5} />
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">Image Generation</span>
-                    <span className="text-xs text-muted-foreground text-center">Create images</span>
-                  </button>
+      <div className="aui-thread-welcome-root relative mx-auto flex w-full max-w-[var(--thread-max-width)] flex-grow flex-col justify-center pb-24">
+        
+        <div className="flex flex-col items-center justify-center space-y-8 mt-12">
+            {/* Badge */}
+            <div className="flex flex-col items-center gap-2">
+                <div 
+                    className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                    style={{ 
+                        backgroundColor: `${settings.primaryColor}15`, 
+                        color: settings.primaryColor 
+                    }}
+                >
+                    Powered by • <span className="underline cursor-pointer font-semibold">PT Mitra Integrasi Informatika</span>
                 </div>
-              </m.div>
-            )}
-          </div>
+            </div>
+
+            {/* Greeting */}
+            <div className="text-center space-y-2">
+                 <h1 className="text-4xl font-serif text-[#2d2d2d]">
+                    Good {time}, {userName}
+                 </h1>
+                 <p className="text-base text-zinc-500 font-light max-w-xl pt-2">
+                    Your dedicated intelligent partner for innovation. Experience the power of enterprise-grade AI designed to elevate your productivity and streamline your workflow.
+                 </p>
+            </div>
+
+            {/* Centered Composer */}
+            <div className="w-full pt-4 space-y-8 flex flex-col items-center">
+                 <Composer isCreating={isCreating} mode={mode} onModeChange={onModeChange} variant="centered" />
+                 
+                 {/* Suggestions */}
+                 <ThreadWelcomeSuggestions />
+            </div>
         </div>
       </div>
     </ThreadPrimitive.Empty>
   );
 };
 
-const ThreadWelcomeSuggestions: FC = () => {
-  const { settings } = usePersonalizationContext()
-  const config = getPersonalizedSiteConfig(settings)
-  const threadRuntime = useThreadRuntime()
 
-  const handleSuggestionClick = (title: string, action: string) => {
-    threadRuntime.composer.setText(action)
-    threadRuntime.composer.send()
-  }
-
-  return (
-    <div className="aui-thread-welcome-suggestions grid w-full gap-2 @md:grid-cols-2">
-
-      {config.chat.recommendationQuestions.slice(0,4).map((suggestedAction, index) => (
-        <m.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 20 }}
-          transition={{ delay: 0.05 * index }}
-          key={`suggested-action-${suggestedAction}-${index}`}
-          className="aui-thread-welcome-suggestion-display [&:nth-child(n+3)]:hidden @md:[&:nth-child(n+3)]:block"
-        >
-              <Button
-                variant="ghost"
-                className="aui-thread-welcome-suggestion w-full h-full flex items-center justify-start gap-3 rounded-xl border bg-white p-4 text-left text-sm transition-all hover:bg-gray-50 hover:shadow-sm dark:bg-gray-900 dark:hover:bg-gray-800"
-                aria-label={suggestedAction}
-                onClick={() => handleSuggestionClick(suggestedAction, suggestedAction)}
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                   <MessageSquare className="h-4 w-4 text-primary" strokeWidth={1.5} />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                   <span className="font-medium text-gray-900 dark:text-gray-100">{suggestedAction}</span>
-                </div>
-              </Button>
-        </m.div>
-      ))}
-    </div>
-  );
-};
 
 interface ComposerProps {
   isDisabled?: boolean;
   isCreating?: boolean;
   mode?: ChatMode;
   onModeChange?: (mode: ChatMode) => void;
+  variant?: 'centered' | 'footer';
 }
 
-const Composer: FC<ComposerProps> = ({ isDisabled = false, isCreating = false, mode = 'chat', onModeChange }) => {
-
+const Composer: FC<ComposerProps> = ({ isDisabled = false, isCreating = false, mode = 'chat', onModeChange, variant = 'footer' }) => {
+  const { settings } = usePersonalizationContext()
   const threadExist = useAssistantState(({thread}) => thread.messages.length > 0)
   const text = useAssistantState(({composer}) => composer.text)
   const isEmpty = text.trim().length < 1
-  const { settings } = usePersonalizationContext()
-  const [showModeMenu, setShowModeMenu] = useState(false)
-
-  const modeOptions = [
-    { value: 'chat' as ChatMode, label: 'Chat', icon: '💬' },
-    { value: 'image' as ChatMode, label: 'Image Generation', icon: '✨' }
-  ]
-
-  const currentMode = modeOptions.find(opt => opt.value === mode) || modeOptions[0]
-
+  
   return (
-    <div className="aui-composer-wrapper sticky bottom-0 mx-auto flex w-full max-w-[var(--thread-max-width)] flex-col gap-4 overflow-visible rounded-t-3xl bg-background pb-2 md:pb-4">
-      <ThreadScrollToBottom />
-      {
-        !isDisabled &&
-        <ThreadPrimitive.Empty>
-        <ThreadWelcomeSuggestions />
-      </ThreadPrimitive.Empty>
-      }
-      <div className="flex flex-col space-y-2">
-        <ComposerPrimitive.Root className={cn(
-          "aui-composer-root relative flex w-full flex-col rounded-3xl border border-border bg-muted px-1 pt-2 shadow-[0_9px_9px_0px_rgba(0,0,0,0.01),0_2px_5px_0px_rgba(0,0,0,0.06)] dark:border-muted-foreground/15",
-          isDisabled && "opacity-50 pointer-events-none"
-        )}>
-          <ComposerAttachments />
-          <ComposerPrimitive.Input
-            placeholder={isDisabled ? "Loading conversation..." : mode === 'image' ? "Describe the image you want to create..." : "Send a message..."}
-            className="aui-composer-input mb-1 max-h-32 min-h-16 w-full resize-none bg-transparent px-3.5 pt-1.5 pb-3 text-base outline-none placeholder:text-muted-foreground focus:outline-primary"
-            rows={1}
-            autoFocus={!isDisabled}
-            aria-label="Message input"
-            disabled={isDisabled || isCreating}
-            />
-          <ComposerAction isDisabled={isDisabled || isEmpty} isCreating={isCreating} mode={mode} onModeChange={onModeChange} />
-        </ComposerPrimitive.Root>
-        {
-          (threadExist || isDisabled) &&
-          <m.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="w-full text-muted-foreground text-xs text-center"
-          >
-            AI may be wrong. Verify important info.
-          </m.div>
-        }
-      </div>
-    </div>
-  );
-};
-
-interface ComposerActionProps {
-  isDisabled?: boolean;
-  isCreating?: boolean;
-  mode?: ChatMode;
-  onModeChange?: (mode: ChatMode) => void;
-}
-
-const ComposerAction: FC<ComposerActionProps> = ({ isDisabled = false, isCreating = false, mode = 'chat', onModeChange }) => {
-  const { settings } = usePersonalizationContext()
-
-  return (
-    <div className="aui-composer-action-wrapper relative mx-1 mt-2 mb-2 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        {
-          Settings.attachments &&
-          <ComposerAddAttachment />
-        }
+    <div className="aui-composer-wrapper mx-auto flex w-full max-w-[var(--thread-max-width)] flex-col gap-2">
+      <ComposerPrimitive.Root className={cn(
+        "relative flex w-full flex-col rounded-2xl border bg-white shadow-sm transition-all focus-within:shadow-md dark:bg-zinc-900 dark:border-zinc-800",
+        variant === 'centered' ? "shadow-md pb-2" : "shadow-sm",
+        isDisabled && "opacity-50 pointer-events-none"
+      )}>
+        <ComposerPrimitive.Input
+          placeholder={mode === 'image' ? "Describe the image you want to create..." : "How can I help you today?"}
+          className="w-full resize-none bg-transparent px-4 py-4 text-base outline-none placeholder:text-zinc-400 min-h-[52px] max-h-32"
+          rows={1}
+          autoFocus={!isDisabled}
+          disabled={isDisabled || isCreating}
+        />
         
-        {/* Mode Selector Dropdown */}
-        {onModeChange && (
-          <ModeSelector mode={mode} onModeChange={onModeChange} primaryColor={settings.primaryColor} />
-        )}
+        {/* Attachments Area */}
+        <div className="px-4">
+            <ComposerAttachments />
+        </div>
+
+        {/* Actions Footer */}
+        <div className="flex items-center justify-between px-3 pb-3 pt-1">
+           <div className="flex items-center gap-2">
+             <ComposerAddAttachment />
+             {onModeChange && (
+                  <ModeSelector mode={mode} onModeChange={onModeChange} />
+              )}
+           </div>
+           
+           <div className="flex items-center gap-2">
+              
+              <ThreadPrimitive.If running={false}>
+                <ComposerPrimitive.Send asChild>
+                  <TooltipIconButton
+                    tooltip="Send message"
+                    disabled={isDisabled || isCreating || isEmpty}
+                    className={cn(
+                        "size-8 rounded-lg transition-all flex items-center justify-center p-0",
+                        isEmpty ? "bg-zinc-100 text-zinc-400" : "text-white shadow-sm hover:opacity-90"
+                    )}
+                    style={!isEmpty ? { backgroundColor: settings.primaryColor } : undefined}
+                  >
+                    {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpIcon className="h-4 w-4" strokeWidth={2.5} />}
+                  </TooltipIconButton>
+                </ComposerPrimitive.Send>
+              </ThreadPrimitive.If>
+              
+              <ThreadPrimitive.If running>
+                <ComposerPrimitive.Cancel asChild>
+                    <button className="size-8 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-zinc-200">
+                        <Square className="h-3 w-3 fill-zinc-500" />
+                    </button>
+                </ComposerPrimitive.Cancel>
+              </ThreadPrimitive.If>
+           </div>
+        </div>
+      </ComposerPrimitive.Root>
+      
+      <div className="flex justify-center">
+         <div className="text-xs text-zinc-400">
+            AI can make mistakes. Please use with discretion.
+         </div>
       </div>
-
-      <ThreadPrimitive.If running={false}>
-        <ComposerPrimitive.Send asChild>
-          <TooltipIconButton
-            tooltip="Send message"
-            side="bottom"
-            type="submit"
-            variant="default"
-            size="icon"
-            className="aui-composer-send size-[34px] rounded-full p-1"
-            aria-label="Send message"
-            disabled={isDisabled || isCreating}
-          >
-            {isCreating ? (
-              <Loader2 className="aui-composer-send-icon size-5 animate-spin" />
-            ) : (
-              <ArrowUpIcon className="aui-composer-send-icon size-5" />
-            )}
-          </TooltipIconButton>
-        </ComposerPrimitive.Send>
-      </ThreadPrimitive.If>
-
-      <ThreadPrimitive.If running>
-        <ComposerPrimitive.Cancel asChild>
-          <Button
-            type="button"
-            variant="default"
-            size="icon"
-            className="aui-composer-cancel size-[34px] rounded-full border border-muted-foreground/60 hover:bg-primary/75 dark:border-muted-foreground/90"
-            aria-label="Stop generating"
-          >
-            <Square className="aui-composer-cancel-icon size-3.5 fill-white dark:fill-black" />
-          </Button>
-        </ComposerPrimitive.Cancel>
-      </ThreadPrimitive.If>
     </div>
   );
 };
+
+
 
 const MessageError: FC = () => {
   return (

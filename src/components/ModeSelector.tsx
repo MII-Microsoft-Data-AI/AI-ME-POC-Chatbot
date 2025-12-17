@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ChevronDown, CheckIcon, MessageSquare, Sparkles } from "lucide-react";
+import { ChevronDown, CheckIcon, MessageSquare, SlidersHorizontal, Image } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ChatMode } from "@/components/assistant-ui/thread";
 
@@ -14,25 +14,39 @@ interface ModeSelectorProps {
 export function ModeSelector({ mode, onModeChange, primaryColor }: ModeSelectorProps) {
   const [showModeMenu, setShowModeMenu] = useState(false);
 
-  const modeOptions = [
-    { value: 'chat' as ChatMode, label: 'Chat', icon: MessageSquare },
-    { value: 'image' as ChatMode, label: 'Image Generation', icon: Sparkles }
-  ];
-
-  const currentMode = modeOptions.find(opt => opt.value === mode) || modeOptions[0];
-  const CurrentIcon = currentMode.icon;
-
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setShowModeMenu(!showModeMenu)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted-foreground/10 transition-colors"
-      >
-        <CurrentIcon className="w-4 h-4" />
-        <span className="hidden sm:inline">{currentMode.label}</span>
-        <ChevronDown className="w-4 h-4" />
-      </button>
+    <div className="relative flex items-center gap-2">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setShowModeMenu(!showModeMenu)}
+          className={cn(
+              "flex items-center gap-1.5 px-2 py-1.5 rounded-md text-sm font-medium transition-colors",
+              "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+          )}
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+          <span>Tools</span>
+          <ChevronDown className="w-4 h-4 text-zinc-400" />
+        </button>
+
+        {/* Active Mode Indicator */}
+        {mode === 'image' && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-zinc-900 text-white text-sm">
+            <Image className="w-4 h-4" />
+            <span>Image</span>
+            <button
+              type="button"
+              onClick={() => onModeChange('chat')}
+              className="ml-0.5 hover:bg-zinc-700 rounded-full p-0.5 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Dropdown Menu */}
       {showModeMenu && (
@@ -41,30 +55,27 @@ export function ModeSelector({ mode, onModeChange, primaryColor }: ModeSelectorP
             className="fixed inset-0 z-40" 
             onClick={() => setShowModeMenu(false)}
           />
-          <div className="absolute bottom-full left-0 mb-2 w-48 bg-background border border-border rounded-lg shadow-lg z-50 overflow-hidden">
-            {modeOptions.map((option) => {
-              const OptionIcon = option.icon;
-              return (
-                <button
-                  key={option.value}
+          <div className="absolute bottom-full mb-2 left-0 w-56 bg-white border border-zinc-200 rounded-xl shadow-lg z-50 overflow-hidden text-zinc-700 p-1.5">
+            <button
                   type="button"
                   onClick={() => {
-                    onModeChange(option.value);
+                    onModeChange(mode === 'image' ? 'chat' : 'image');
                     setShowModeMenu(false);
                   }}
                   className={cn(
-                    "w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors",
-                    mode === option.value && "bg-muted"
+                    "w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left rounded-lg transition-colors hover:bg-zinc-100",
+                    mode === 'image' && "bg-zinc-50"
                   )}
                 >
-                  <OptionIcon className="w-4 h-4" />
-                  <span className="font-medium">{option.label}</span>
-                  {mode === option.value && (
-                    <CheckIcon className="w-4 h-4 ml-auto" style={{ color: primaryColor }} />
+                  <Image className={cn("w-4 h-4", mode === 'image' ? "text-blue-500" : "text-zinc-400")} />
+                  <div className="flex flex-col">
+                     <span className="font-medium text-zinc-900">Create images</span>
+                     <span className="text-xs text-zinc-500">Generate images with AI</span>
+                  </div>
+                  {mode === 'image' && (
+                    <CheckIcon className="w-4 h-4 ml-auto text-blue-500" />
                   )}
-                </button>
-              );
-            })}
+            </button>
           </div>
         </>
       )}
