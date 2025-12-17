@@ -7,9 +7,7 @@ aiohttp==3.12.15
 aiosignal==1.4.0
     # via aiohttp
 aiosqlite==0.21.0
-    # via
-    #   mock-backend (pyproject.toml)
-    #   langgraph-checkpoint-sqlite
+    # via langgraph-checkpoint-sqlite
 annotated-types==0.7.0
     # via pydantic
 anyio==4.11.0
@@ -17,8 +15,6 @@ anyio==4.11.0
     #   httpx
     #   openai
     #   starlette
-asyncpg==0.31.0
-    # via mock-backend (pyproject.toml)
 attrs==25.3.0
     # via aiohttp
 azure-ai-documentintelligence==1.0.2
@@ -29,9 +25,12 @@ azure-core==1.35.1
     # via
     #   mock-backend (pyproject.toml)
     #   azure-ai-documentintelligence
+    #   azure-cosmos
     #   azure-identity
     #   azure-search-documents
     #   azure-storage-blob
+azure-cosmos==4.14.3
+    # via mock-backend (pyproject.toml)
 azure-identity==1.25.0
     # via langchain-azure-dynamic-sessions
 azure-search-documents==11.5.3
@@ -245,6 +244,7 @@ typing-extensions==4.15.0
     #   anyio
     #   azure-ai-documentintelligence
     #   azure-core
+    #   azure-cosmos
     #   azure-identity
     #   azure-search-documents
     #   azure-storage-blob
