@@ -26,8 +26,8 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
   const [isPinned, setIsPinned] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
-  const { getGroupedChatHistory, togglePinChat, deleteChat, isInitialLoading } = useChat()
-  const { showConfirmation } = useModal()
+  const { getGroupedChatHistory, togglePinChat, deleteChat, renameChat, isInitialLoading } = useChat()
+  const { showConfirmation, showRenameModal } = useModal()
   const router = useRouter()
   const pathname = usePathname()
   const { settings } = usePersonalizationContext()
@@ -82,6 +82,21 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
         onConfirm: () => deleteChat(chatId)
       })
     }
+  }
+
+  // Handle rename with rename modal
+  const handleRenameChat = (chatId: string, currentTitle: string) => {
+    showRenameModal({
+      chatId: chatId,
+      currentTitle: currentTitle,
+      onRename: async (newTitle: string) => {
+        try {
+          await renameChat(chatId, newTitle)
+        } catch (err) {
+          throw err
+        }
+      }
+    })
   }
 
   // Get mobile title based on current page
@@ -207,12 +222,12 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                       <ChatSkeleton isMobile={true} count={4} />
                     ) : (
                       <>
-                        <ChatGroup title="Pinned" chats={groupedChats.pinned} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} isMobile={true} />
-                        <ChatGroup title="Today" chats={groupedChats.today} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} isMobile={true} />
-                        <ChatGroup title="Yesterday" chats={groupedChats.yesterday} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} isMobile={true} />
-                        <ChatGroup title="Previous 7 Days" chats={groupedChats.previous7Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} isMobile={true} />
-                        <ChatGroup title="Previous 30 Days" chats={groupedChats.previous30Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} isMobile={true} />
-                        <ChatGroup title="Older" chats={groupedChats.older} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} isMobile={true} />
+                        <ChatGroup title="Pinned" chats={groupedChats.pinned} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={handleRenameChat} isMobile={true} />
+                        <ChatGroup title="Today" chats={groupedChats.today} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={handleRenameChat} isMobile={true} />
+                        <ChatGroup title="Yesterday" chats={groupedChats.yesterday} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={handleRenameChat} isMobile={true} />
+                        <ChatGroup title="Previous 7 Days" chats={groupedChats.previous7Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={handleRenameChat} isMobile={true} />
+                        <ChatGroup title="Previous 30 Days" chats={groupedChats.previous30Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={handleRenameChat} isMobile={true} />
+                        <ChatGroup title="Older" chats={groupedChats.older} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={handleRenameChat} isMobile={true} />
                       </>
                     )}
                   </div>
@@ -426,12 +441,12 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                  >
                     {isInitialLoading ? <ChatSkeleton count={6} /> : (
                       <>
-                        <ChatGroup title="Pinned" chats={groupedChats.pinned} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} />
-                        <ChatGroup title="Today" chats={groupedChats.today} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} />
-                        <ChatGroup title="Yesterday" chats={groupedChats.yesterday} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} />
-                        <ChatGroup title="Previous 7 Days" chats={groupedChats.previous7Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} />
-                        <ChatGroup title="Previous 30 Days" chats={groupedChats.previous30Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} />
-                        <ChatGroup title="Older" chats={groupedChats.older} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} />
+                        <ChatGroup title="Pinned" chats={groupedChats.pinned} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={handleRenameChat} />
+                        <ChatGroup title="Today" chats={groupedChats.today} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={handleRenameChat} />
+                        <ChatGroup title="Yesterday" chats={groupedChats.yesterday} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={handleRenameChat} />
+                        <ChatGroup title="Previous 7 Days" chats={groupedChats.previous7Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={handleRenameChat} />
+                        <ChatGroup title="Previous 30 Days" chats={groupedChats.previous30Days} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={handleRenameChat} />
+                        <ChatGroup title="Older" chats={groupedChats.older} onChatClick={handleChatClick} onTogglePin={togglePinChat} onDeleteChat={handleDeleteChat} onRenameChat={handleRenameChat} />
                       </>
                     )}
                  </motion.div>

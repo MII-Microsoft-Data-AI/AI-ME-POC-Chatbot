@@ -42,7 +42,7 @@ export function useConversationCreator(mode: ChatMode) {
 
         // Create conversation with timeout
         const createdId = await withTimeout(
-          CreateConversation(conversationId),
+          CreateConversation(conversationId, message),
           CONVERSATION_CONSTANTS.CREATION_TIMEOUT_MS,
           'Conversation creation timeout (30s)'
         )

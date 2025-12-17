@@ -6,6 +6,7 @@ import { ChatProvider } from "@/contexts/ChatContext"
 import { ModalProvider } from "@/contexts/ModalContext"
 import { PersonalizationProvider } from "@/contexts/PersonalizationContext"
 import ConfirmationModal from "./ConfirmationModal"
+import RenameModal from "./RenameModal"
 
 interface ProvidersProps {
   children: ReactNode
@@ -19,6 +20,7 @@ export default function Providers({ children }: ProvidersProps) {
           <ModalProvider>
             {children}
             <ConfirmationModal />
+            <RenameModal />
           </ModalProvider>
         </ChatProvider>
       </PersonalizationProvider>

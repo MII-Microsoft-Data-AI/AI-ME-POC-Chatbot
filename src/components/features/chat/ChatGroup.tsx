@@ -13,9 +13,9 @@ interface ChatGroupProps {
   onChatClick: (chatId: string) => void
   onTogglePin?: (chatId: string) => Promise<void>
   onDeleteChat?: (chatId: string) => Promise<void>
+  onRenameChat?: (chatId: string, currentTitle: string) => void
   isCollapsed?: boolean
   isMobile?: boolean
-  // Add standardized icon stroke width prop
 }
 
 export function ChatGroup({ 
@@ -23,7 +23,8 @@ export function ChatGroup({
   chats, 
   onChatClick, 
   onTogglePin, 
-  onDeleteChat, 
+  onDeleteChat,
+  onRenameChat,
   isCollapsed = false, 
   isMobile = false 
 }: ChatGroupProps) {
@@ -145,7 +146,9 @@ export function ChatGroup({
                     <button
                         onClick={(e) => {
                            e.stopPropagation()
-                           // rename logic placeholder
+                           if (onRenameChat) {
+                             onRenameChat(chat.id, chat.title)
+                           }
                            setActiveMenuId(null)
                         }}
                         className="w-full text-left px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f8f8f8] flex items-center gap-2"

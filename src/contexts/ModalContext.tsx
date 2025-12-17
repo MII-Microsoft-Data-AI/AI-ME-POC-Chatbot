@@ -13,6 +13,13 @@ interface ConfirmationAlert {
   type?: 'danger' | 'info' | 'warning'
 }
 
+interface RenameModal {
+  isOpen: boolean
+  chatId?: string | null
+  currentTitle: string
+  onRename?: (newTitle: string) => void | Promise<void>
+}
+
 interface ModalContextType {
   confirmationAlert: ConfirmationAlert
   showConfirmation: (options: {
@@ -26,6 +33,13 @@ interface ModalContextType {
   }) => void
   hideConfirmation: () => void
   confirmAction: () => void
+  renameModal: RenameModal
+  showRenameModal: (options: {
+    chatId?: string
+    currentTitle: string
+    onRename: (newTitle: string) => void | Promise<void>
+  }) => void
+  hideRenameModal: () => void
 }
 
 const ModalContext = createContext<ModalContextType | undefined>(undefined)
@@ -50,6 +64,13 @@ export function ModalProvider({ children }: ModalProviderProps) {
     chatId: null,
     onConfirm: undefined,
     type: 'danger'
+  })
+
+  const [renameModal, setRenameModal] = useState<RenameModal>({
+    isOpen: false,
+    chatId: null,
+    currentTitle: '',
+    onRename: undefined
   })
 
   const showConfirmation = (options: {
@@ -87,12 +108,35 @@ export function ModalProvider({ children }: ModalProviderProps) {
     hideConfirmation()
   }
 
+  const showRenameModal = (options: {
+    chatId?: string
+    currentTitle: string
+    onRename: (newTitle: string) => void | Promise<void>
+  }) => {
+    setRenameModal({
+      isOpen: true,
+      chatId: options.chatId || null,
+      currentTitle: options.currentTitle,
+      onRename: options.onRename
+    })
+  }
+
+  const hideRenameModal = () => {
+    setRenameModal(prev => ({
+      ...prev,
+      isOpen: false
+    }))
+  }
+
   return (
     <ModalContext.Provider value={{
       confirmationAlert,
       showConfirmation,
       hideConfirmation,
-      confirmAction
+      confirmAction,
+      renameModal,
+      showRenameModal,
+      hideRenameModal
     }}>
       {children}
     </ModalContext.Provider>

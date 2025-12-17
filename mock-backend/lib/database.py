@@ -1,6 +1,6 @@
 """Database models and operations for conversation and file metadata - Cosmos DB."""
 import time
-from typing import List, Optional
+from typing import List, Optional, Union
 from dataclasses import dataclass, asdict
 from lib.db_connection import db_connection
 from azure.cosmos.exceptions import CosmosResourceNotFoundError
@@ -12,6 +12,7 @@ class ConversationMetadata:
     id: str
     userid: str
     is_pinned: bool
+    title: Union[str, None]
     created_at: int  # epoch timestamp
 
 
@@ -34,8 +35,32 @@ class DatabaseManager:
     
     def __init__(self):
         pass
+
+    async def rename_conversation(self, conversation_id: str, userid: str, new_title: str) -> bool:
+        """Rename a conversation."""
+        container = db_connection.get_conversations_container()
+        
+        try:
+            # Read the item first
+            item = await container.read_item(
+                item=conversation_id,
+                partition_key=userid
+            )
+            
+            # Update the title field
+            item['title'] = new_title
+
+            # Replace the item
+            await container.replace_item(
+                item=conversation_id,
+                body=item
+            )
+            
+            return True
+        except CosmosResourceNotFoundError:
+            return False
     
-    async def create_conversation(self, conversation_id: str, userid: str) -> ConversationMetadata:
+    async def create_conversation(self, conversation_id: str, title: str, userid: str) -> ConversationMetadata:
         """Create a new conversation metadata entry."""
         created_at = int(time.time())
         
@@ -45,12 +70,14 @@ class DatabaseManager:
             "id": conversation_id,
             "userid": userid,
             "is_pinned": False,
-            "created_at": created_at
+            "created_at": created_at,
+            "title": title 
         }
         
         await container.create_item(body=document)
         
         return ConversationMetadata(
+            title=title,
             id=conversation_id,
             userid=userid,
             is_pinned=False,
@@ -71,7 +98,8 @@ class DatabaseManager:
                 id=item['id'],
                 userid=item['userid'],
                 is_pinned=item['is_pinned'],
-                created_at=item['created_at']
+                created_at=item['created_at'],
+                title=item.get('title', None)
             )
         except CosmosResourceNotFoundError:
             return None
@@ -95,7 +123,8 @@ class DatabaseManager:
                 id=item['id'],
                 userid=item['userid'],
                 is_pinned=item['is_pinned'],
-                created_at=item['created_at']
+                created_at=item['created_at'],
+                title=item.get('title', None)
             ))
         
         return conversations

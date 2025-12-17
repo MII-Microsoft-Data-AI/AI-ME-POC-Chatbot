@@ -142,13 +142,13 @@ export const TogglePinConversation = async (conversationId: string) => {
   return true
 }
 
-export const CreateConversation = async (conversationId: string) => {
+export const CreateConversation = async (conversationId: string, initialChat: string) => {
   const response = await fetch(`${BaseAPIPath}/create-conversation`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ conversationId }),
+    body: JSON.stringify({ conversationId, initialChat }),
   });
   
   if (!response.ok) {
@@ -170,6 +170,22 @@ export const DeleteConversation = async (conversationId: string) => {
   
   if (!response.ok) {
     console.error('Failed to delete conversation')
+    return false
+  }
+  return true
+}
+
+export const RenameConversation = async (conversationId: string, newTitle: string): Promise<boolean> => {
+  const response = await fetch(`${BaseAPIPath}/conversations/${conversationId}/rename`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ new_title: newTitle }),
+  });
+  
+  if (!response.ok) {
+    console.error('Failed to rename conversation')
     return false
   }
   return true
