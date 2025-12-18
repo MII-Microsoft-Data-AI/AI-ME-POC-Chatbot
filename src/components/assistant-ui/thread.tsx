@@ -119,27 +119,27 @@ const ThreadWelcomeSuggestions: FC = () => {
     }
   
     return (
-      <div className="w-full max-w-4xl">
-        <div className="flex overflow-x-auto snap-x gap-2.5 px-2 pb-2 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible sm:pb-0 scrollbar-hide">
+      <div className="w-full px-4 md:px-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
             {config.chat.recommendationQuestions.slice(0, 4).map((question, index) => (
                 <button
                     key={index}
                     onClick={() => handleSuggestionClick(question)}
-                    className="flex-none min-w-[calc(50%-5px)] snap-start flex h-full flex-col justify-between rounded-lg bg-white p-3 text-left transition-all hover:bg-zinc-50 shadow-sm hover:shadow border border-zinc-200"
+                    className="group relative flex items-center justify-between gap-3 rounded-xl border border-zinc-200/80 bg-white p-4 text-left transition-all hover:border-zinc-300 hover:shadow-sm hover:bg-zinc-50/50"
                 >
-                    <span className="text-sm font-normal text-gray-700 line-clamp-2 md:line-clamp-3 leading-snug">{question}</span>
-                    <div className="mt-2 md:mt-3 flex w-full justify-end">
-                        <div 
-                            className="rounded-full p-1.5"
-                            style={{ 
-                                backgroundColor: `${settings.primaryColor}15`
-                            }}
-                        >
-                            <MessageSquare 
-                                className="h-3.5 w-3.5" 
-                                style={{ color: settings.primaryColor }}
-                            />
-                        </div>
+                    <span className="text-sm font-medium text-zinc-600 line-clamp-2 leading-relaxed group-hover:text-zinc-900">
+                        {question}
+                    </span>
+                    <div 
+                        className="shrink-0 rounded-full p-1.5 opacity-0 transition-all group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0"
+                         style={{ 
+                            backgroundColor: `${settings.primaryColor}10`
+                        }}
+                    >
+                        <ArrowUpIcon 
+                            className="h-3.5 w-3.5" 
+                             style={{ color: settings.primaryColor }}
+                        />
                     </div>
                 </button>
             ))}
@@ -235,7 +235,7 @@ const Composer: FC<ComposerProps> = ({ isDisabled = false, isCreating = false, m
         {/* Actions Footer */}
         <div className="flex items-center justify-between px-3 pb-3 pt-1">
            <div className="flex items-center gap-2">
-             {mode === 'image' && <ComposerAddAttachment />}
+             <ComposerAddAttachment />
              {onModeChange && (
                   <ModeSelector mode={mode} onModeChange={onModeChange} primaryColor={settings.primaryColor} />
               )}

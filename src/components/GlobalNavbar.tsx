@@ -291,16 +291,21 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                                 <span>Settings</span>
                             </div>
                           </button>
+                      </div>
+
+                      <div className="py-1">
                           <button 
                               onClick={() => {
-                                  router.push('/resource-management')
+                                  router.push('/settings/resources')
                                   setShowProfileMenu(false)
                                   setIsMobileSidebarOpen(false)
                               }}
-                              className="w-full text-left px-4 py-2 hover:bg-[#f5f5f5] flex items-center gap-3 text-[#2d2d2d]"
+                              className="w-full text-left px-4 py-2 hover:bg-[#f5f5f5] flex items-center justify-between text-[#2d2d2d]"
                           >
-                            <Database className="w-4 h-4 text-[#5f5f5f]" strokeWidth={1.5} />
-                            <span>Resource Management</span>
+                            <div className="flex items-center gap-3">
+                                <Database className="w-4 h-4 text-[#5f5f5f]" strokeWidth={1.5} />
+                                <span>Resource management</span>
+                            </div>
                           </button>
                       </div>
 
@@ -350,7 +355,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
         animate={isCollapsed ? "collapsed" : "expanded"}
         variants={sidebarVariants}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="hidden md:flex h-screen flex-col border-r border-[#f0f0f0] bg-[#ffffff] relative z-30 overflow-hidden"
+        className="hidden md:flex h-screen flex-col bg-[#ffffff] relative z-30 overflow-hidden border-r border-[#f0f0f0]"
       >
         {/* Header */}
         <div className="flex-shrink-0 min-h-[60px] flex items-center justify-between px-3 pt-3 pb-2">
@@ -512,15 +517,20 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
                               <span>Settings</span>
                            </div>
                         </button>
+                    </div>
+
+                    <div className="py-1">
                         <button 
                             onClick={() => {
-                                router.push('/resource-management')
+                                router.push('/settings/resources')
                                 setShowProfileMenu(false)
                             }}
-                            className="w-full text-left px-4 py-2 hover:bg-[#f5f5f5] flex items-center gap-3 text-[#2d2d2d]"
+                            className="w-full text-left px-4 py-2 hover:bg-[#f5f5f5] flex items-center justify-between text-[#2d2d2d]"
                         >
-                           <Database className="w-4 h-4 text-[#5f5f5f]" strokeWidth={1.5} />
-                           <span>Resource Management</span>
+                           <div className="flex items-center gap-3">
+                              <Database className="w-4 h-4 text-[#5f5f5f]" strokeWidth={1.5} />
+                              <span>Resource management</span>
+                           </div>
                         </button>
                     </div>
 

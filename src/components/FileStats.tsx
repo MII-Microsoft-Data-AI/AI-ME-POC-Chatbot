@@ -1,6 +1,7 @@
 'use client'
 
 import { FileMetadata } from '@/lib/integration/client/file-indexing'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface FileStatsProps {
   files: FileMetadata[]
@@ -83,50 +84,53 @@ export default function FileStats({ files }: FileStatsProps) {
   ].filter(item => item.label === 'Total Files' || item.value > 0)
 
   return (
-    <div className="rounded-lg shadow-sm border border-gray-200 p-6 mb-6" style={{ backgroundColor: 'var(--background)' }}>
-      <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>File Statistics</h2>
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle>File Statistics</CardTitle>
+      </CardHeader>
       
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {statItems.map((item) => (
-          <div
-            key={item.label}
-            className="flex flex-col items-center p-4 rounded-lg border"
-            style={{ backgroundColor: 'var(--background)' }}
-          >
-            <div className={`p-2 rounded-full ${item.bgColor} ${item.color} mb-2`}>
-              {item.icon}
-            </div>
-            <div className="text-center">
-              <div className={`text-2xl font-bold ${item.color}`}>
-                {item.value}
-              </div>
-              <div className="text-sm text-gray-600 font-medium">
-                {item.label}
-              </div>
-              {'percentage' in item && item.percentage !== undefined && (
-                <div className="text-xs text-gray-500 mt-1">
-                  {item.percentage}%
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {stats.total > 0 && (
-        <div className="mt-6">
-          <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-            <span>Indexing Progress</span>
-            <span>{getPercentage(stats.completed)}% Complete</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {statItems.map((item) => (
             <div
-              className="bg-green-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${getPercentage(stats.completed)}%` }}
-            ></div>
-          </div>
+              key={item.label}
+              className="flex flex-col items-center p-4 rounded-lg border bg-background"
+            >
+              <div className={`p-2 rounded-full ${item.bgColor} ${item.color} mb-2`}>
+                {item.icon}
+              </div>
+              <div className="text-center">
+                <div className={`text-2xl font-bold ${item.color}`}>
+                  {item.value}
+                </div>
+                <div className="text-sm text-gray-600 font-medium">
+                  {item.label}
+                </div>
+                {'percentage' in item && item.percentage !== undefined && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    {item.percentage}%
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
-      )}
-    </div>
+
+        {stats.total > 0 && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+              <span>Indexing Progress</span>
+              <span>{getPercentage(stats.completed)}% Complete</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${getPercentage(stats.completed)}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
