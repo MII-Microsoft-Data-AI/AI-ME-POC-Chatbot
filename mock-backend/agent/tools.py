@@ -76,6 +76,7 @@ tool_generator.append(get_current_time)
 
 if os.getenv("AZURE_SESSIONPOOL_ENDPOINT"):
     code_tool = SessionsPythonREPLTool(
+        name="python",
         pool_management_endpoint=os.getenv("AZURE_SESSIONPOOL_ENDPOINT")
     )
     tool_generator.append(code_tool)
@@ -156,71 +157,7 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
     )
 
     @tool(args_schema=AzureSearchInput)
-    def azure_search_documents(query: str, top: int = 5) -> str:
-        """Search documents in Azure AI Search using text-based search.
-        
-        Args:
-            query: Search query string
-            top: Number of results to return (default: 5, max: 50)
-            
-        Returns:
-            str: Formatted search results with content and metadata
-        """
-        try:
-            top = min(max(1, top), 50)  # Ensure top is between 1 and 50
-            print(f"🔍 Text search: query='{query}', top={top}")
-            
-            results = search_client.search(
-                search_text=query,
-                top=top,
-                include_total_count=True
-            )
-            
-            formatted_results = []
-            result_count = 0
-            for result in results:
-                result_count += 1
-                print(f"  📄 Result {result_count}: score={getattr(result, '@search.score', 'N/A')}")
-                
-                formatted_result = {
-                    "score": getattr(result, "@search.score", "N/A"),
-                    "content": result.get("content", "No content"),
-                    "metadata": {k: v for k, v in result.items() if not k.startswith("@") and k not in ["content"]}
-                }
-                formatted_results.append(formatted_result)
-            
-            print(f"  ✅ Total results found: {result_count}")
-            
-            if not formatted_results:
-                return f"No results found for query: '{query}'"
-            
-            # Format results as readable text
-            output = f"Found {len(formatted_results)} results for '{query}':\n\n"
-            for i, result in enumerate(formatted_results, 1):
-                filename = result['metadata'].get('filename', 'Unknown')
-                chunk_index = result['metadata'].get('chunk_index', 0)
-                id_ = result['metadata'].get('id', 'Unknown')
-                content = result['content']
-                score = result['score']
-                
-                output += f"## Result {i} (Score: {score:.4f})\n"
-                output += f"**File**: {filename} | **Chunk**: {chunk_index} | **ID**: `{id_}`\n\n"
-                output += f"{content}\n\n"
-                output += "---\n\n"
-            
-            return output
-            
-        except Exception as e:
-            error_msg = f"Error searching Azure AI Search: {str(e)}"
-            print(f"  ❌ {error_msg}")
-            import traceback
-            print(traceback.format_exc())
-            return error_msg
-
-    tool_generator.append(azure_search_documents)
-
-    @tool(args_schema=AzureSearchInput)
-    def azure_search_semantic(query: str, top: int = 5) -> str:
+    def document_search(query: str, top: int = 5) -> str:
         """Search documents in Azure AI Search using semantic search capabilities.
         
         Args:
@@ -294,7 +231,7 @@ if (os.getenv("AZURE_SEARCH_ENDPOINT") and
             print(traceback.format_exc())
             return error_msg
 
-    tool_generator.append(azure_search_semantic)
+    tool_generator.append(document_search)
 
     @tool
     def generate_image(prompt: str) -> str:

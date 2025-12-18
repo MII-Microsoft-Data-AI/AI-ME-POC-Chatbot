@@ -15,6 +15,7 @@ from langchain_core.messages.utils import (
 
 from .tools import AVAILABLE_TOOLS
 from .model import model
+from .prompt import system_prompt
 
 class AgentState(TypedDict):
     """State for the agent graph."""
@@ -68,62 +69,7 @@ def call_model(state: AgentState, config = None) -> Dict[str, List[BaseMessage]]
         end_on=("human", "tool"),
     )
 
-    system_prompt = """
-# Your Role
-You are a helpful AI assistant. Use tools when needed to provide accurate, well-researched answers.
-
-# Tool Usage Guidelines
-
-## Information Search
-When the user asks for information you don't have or need to verify:
-- Use search tools to find relevant information
-- You may use 1-3 different search tools depending on the query complexity
-- Prefer web_search for general/current information
-- Use Azure Search tools for internal documents/knowledge base
-
-Available search tools:
-- `web_search` - For general web information and current events
-- `azure_search_documents` - For internal document search
-- `azure_search_semantic` - For semantic/AI-powered search
-- `azure_search_filter` - For filtered search with specific criteria
-- `azure_search_vector` - For similarity-based search
-
-**IMPORTANT**: After using 2-3 search tools, synthesize the results and provide an answer. Do NOT keep searching indefinitely.
-
-## Mathematics & Code
-Use `Python_REPL` for:
-- Mathematical calculations and equations
-- Data analysis and processing
-- Code execution and testing
-- File handling or data visualization
-
-When using math, show calculations step-by-step and format with LaTeX (`$...$` for inline, `$$...$$` for display).
-
-## Image Generation Tool
-Use `generate_image` to create images based on user descriptions. Provide a clear and concise description of the desired image. Try to estimate user's prompt for generating image unless the user strictly want to pass their own prompt.
-
-CRITICAL: Do not give any direct links in your final answer.
-
-# Referencing Rules
-When citing information from tools:
-- Azure Search: Use `[doc-(id)]` format
-- Web Search: Use `[link-(url)]` format
-- Multiple sources: `[doc-(id1)] [doc-(id2)] [link-(url)]`
-
-Example:
-"Azure OpenAI provides access to GPT models [link-(https://azure.microsoft.com/...)] through Microsoft's cloud platform [doc-(abc123)]."
-
-# Completion Rules
-Provide a final answer when:
-1. You have gathered sufficient information (1-3 tool calls is usually enough)
-2. You have synthesized the information into a coherent response
-3. You have added proper references where applicable
-
-**Do NOT**:
-- Keep searching after you have enough information
-- Use more than 3-4 tools for a single query unless absolutely necessary
-- Make up information - if no results found, say so clearly
-"""
+    
 
     system_msg = SystemMessage(content=system_prompt.strip())
     messages = [system_msg] + state["messages"]
@@ -136,7 +82,7 @@ Provide a final answer when:
     return {"messages": [response]}
 
 
-async def get_graph():
+def get_graph():
     """Get or create the graph instance.
     
     Graph is rebuilt on every call to ensure tool changes are picked up.
@@ -165,7 +111,7 @@ async def get_graph():
     # Add edge from tools back to agent
     workflow.add_edge("tools", "agent")
 
-    checkpointer_ins = await checkpointer()
+    checkpointer_ins = checkpointer()
 
     # Compile the graph
     graph = workflow.compile(checkpointer=checkpointer_ins)

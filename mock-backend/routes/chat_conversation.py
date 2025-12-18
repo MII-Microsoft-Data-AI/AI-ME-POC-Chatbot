@@ -63,8 +63,8 @@ async def generate_image_stream(prompt: str, conversation_id: str):
         
         # Save to LangGraph state FIRST before streaming
         try:
-            graph = await get_graph()
-            await graph.aupdate_state(
+            graph = get_graph()
+            graph.update_state(
                 config={"configurable": {"thread_id": conversation_id}},
                 values={
                     "messages": [
@@ -148,7 +148,7 @@ async def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], 
     # Fetch list of conversations for the user from the database
     conversations = await db_manager.get_user_conversations(userid)
 
-    graph = await get_graph()
+    graph = get_graph()
     
     # Convert to the expected API response format
     response = []
@@ -162,7 +162,7 @@ async def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], 
         # Get title from first message in LangGraph state if still default
         if title == "New Conversation":
             # Get the first message from the conversation to use as title
-            conv_graph_val = (await graph.aget_state(config={"configurable": {"thread_id": conv.id}})).values
+            conv_graph_val = (graph.get_state(config={"configurable": {"thread_id": conv.id}})).values
             conv_graph_messages = conv_graph_val.get("messages", []) if conv_graph_val else []
             title = "New Conversation"  # Default title
 
@@ -206,16 +206,17 @@ async def get_chat_history(_: Annotated[str, Depends(get_authenticated_user)], u
     
     # Fetch chat history for the conversation from LangGraph state
     try:
-        graph = await get_graph()
+        graph = get_graph()
         # Get the conversation state from the checkpointer
-        states_generator = graph.aget_state_history(config={"configurable": {"thread_id": conversation_id}})
-        states = [x async for x in states_generator]
+        states_generator = graph.get_state_history(config={"configurable": {"thread_id": conversation_id}})
+        states = [x for x in states_generator]
 
         json_dumps = dumps(states)
         
         return json.loads(json_dumps)
         
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=f"Failed to fetch chat history: {str(e)}")
 
 @chat_conversation_route.post("/conversations/{conversation_id}/chat")
@@ -275,7 +276,7 @@ async def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], 
             "content": last_message_langgraph_content
         }]
 
-        graph = await get_graph()
+        graph = get_graph()
 
         return StreamingResponse(
             generate_stream(graph, input_message, conversation_id),
