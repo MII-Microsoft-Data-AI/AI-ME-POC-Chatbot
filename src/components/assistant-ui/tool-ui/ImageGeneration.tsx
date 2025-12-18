@@ -82,7 +82,7 @@ export const GenerateImageUI = makeAssistantToolUI<GenerateImageArgs, GenerateIm
   render: ({ result, status }) => {
     // Tool outputs stream in; `result` will be `undefined` until the tool resolves.
 
-    if (status.type == 'complete') {
+    if (result) {
       return <AnimatedImage
         src={result}
       />
@@ -92,11 +92,8 @@ export const GenerateImageUI = makeAssistantToolUI<GenerateImageArgs, GenerateIm
       return <ImageGenerationLoading />;
     }
 
-    if (status.type === 'incomplete' || status.type == 'requires-action') {
-      return <ImageGenerationFailed />;
-    }
-
-    return <></>
+   
+    return <ImageGenerationFailed />;
 
   },
 })
