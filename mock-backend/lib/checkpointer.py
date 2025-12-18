@@ -22,7 +22,7 @@ os.environ["COSMOSDB_KEY"] = os.getenv("COSMOS_KEY")
 # Global cached checkpointer instance
 _checkpointer_instance = None
 
-async def checkpointer():
+def checkpointer():
     """Get or create the cached checkpointer instance.
     
     This avoids creating a new SQLite connection on every request.

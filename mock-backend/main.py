@@ -63,7 +63,7 @@ async def startup_event():
     # Initialize LangGraph
     print("🤖 Initializing LangGraph...")
     from agent.graph import get_graph
-    await get_graph()  # This will cache the graph
+    get_graph()  # This will cache the graph
     
     print("✅ Server ready")
 

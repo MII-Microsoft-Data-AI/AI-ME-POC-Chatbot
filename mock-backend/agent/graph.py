@@ -136,7 +136,7 @@ Provide a final answer when:
     return {"messages": [response]}
 
 
-async def get_graph():
+def get_graph():
     """Get or create the graph instance.
     
     Graph is rebuilt on every call to ensure tool changes are picked up.
@@ -165,7 +165,7 @@ async def get_graph():
     # Add edge from tools back to agent
     workflow.add_edge("tools", "agent")
 
-    checkpointer_ins = await checkpointer()
+    checkpointer_ins = checkpointer()
 
     # Compile the graph
     graph = workflow.compile(checkpointer=checkpointer_ins)

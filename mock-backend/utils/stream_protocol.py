@@ -13,7 +13,7 @@ from langchain_core.messages import AIMessageChunk, AIMessage, ToolMessage, Huma
 DEBUG_STREAM = True
 
 
-async def handle_tool_message(msg: ToolMessage):
+def handle_tool_message(msg: ToolMessage):
     """
     Handle ToolMessage - processes tool results and yields ToolCallResult (a:) chunks
     """
@@ -43,7 +43,7 @@ async def handle_tool_message(msg: ToolMessage):
         yield f"a:{error_payload}\n"
 
 
-async def handle_ai_message(msg: typing.Union[AIMessage, AIMessageChunk], tool_calls_by_idx: dict, tool_calls: dict, accumulated_text: str, token_count: int):
+def handle_ai_message(msg: typing.Union[AIMessage, AIMessageChunk], tool_calls_by_idx: dict, tool_calls: dict, accumulated_text: str, token_count: int):
     """
     Handle AIMessage/AIMessageChunk - processes text content and tool calls
     Returns tuple of (accumulated_text, token_count)
@@ -124,7 +124,7 @@ async def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMe
     if DEBUG_STREAM:
         stream_msg_count = 0
     try:
-        async for msg, metadata in graph.astream(
+        for msg, metadata in graph.stream(
             {"messages": input_message},
             config={"configurable": {"thread_id": conversation_id}},
             stream_mode="messages",
@@ -137,13 +137,13 @@ async def generate_stream(graph: CompiledStateGraph, input_message: List[HumanMe
                 stream_msg_count += 1
             try:
                 if isinstance(msg, ToolMessage):
-                    async for chunk in handle_tool_message(msg):
+                    for chunk in handle_tool_message(msg):
                         if DEBUG_STREAM:
                             print(f"  📤 SENDING CHUNK: {chunk.strip()}")
                         yield chunk
 
                 elif isinstance(msg, AIMessageChunk) or isinstance(msg, AIMessage):
-                    async for chunk in handle_ai_message(msg, tool_calls_by_idx, tool_calls, accumulated_text, token_count):
+                    for chunk in handle_ai_message(msg, tool_calls_by_idx, tool_calls, accumulated_text, token_count):
                         if isinstance(chunk, tuple):
                             accumulated_text, token_count = chunk
                         else:
