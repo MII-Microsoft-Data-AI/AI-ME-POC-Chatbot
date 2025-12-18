@@ -1,294 +1,245 @@
 'use client'
 
-/**
- * Settings page with personalization features
- * 
- * Features:
- * - Change site name (appears in header and browser title)
- * - Change site icon/logo and favicon
- * - Change primary color theme
- * - Real-time preview of changes
- * - Persistent storage in localStorage
- * - Automatic application of settings across the app
- * 
- * Usage:
- * 1. Site Name: Enter custom name for your chat application
- * 2. Site Icon: Provide image URL (PNG/JPG/SVG) for logo and favicon
- * 3. Primary Color: Use color picker or enter hex code for theme color
- * 4. Preview changes in real-time before saving
- * 5. Save changes to persist across sessions
- */
-
-import { useState, useEffect } from 'react'
-import { usePersonalizationContext } from '@/contexts/PersonalizationContext'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import React, { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { Palette, ImageIcon, RotateCcw, Type } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
+import { Select } from '@/components/ui/select'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { cn } from '@/lib/utils'
+import { Check, Monitor, Moon, Sun } from 'lucide-react'
+
+// --- Types & Constants ---
+
+type SettingSection = 'general' | 'account' | 'privacy' | 'billing' | 'capabilities' | 'connectors'
+
+interface NavItem {
+  id: SettingSection
+  label: string
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { id: 'general', label: 'General' },
+  { id: 'account', label: 'Account' },
+  { id: 'privacy', label: 'Privacy' },
+  { id: 'billing', label: 'Billing' },
+  { id: 'capabilities', label: 'Capabilities' },
+  { id: 'connectors', label: 'Connectors' },
+]
 
 export default function SettingsPage() {
-  const { settings, updateSettings, resetSettings, isLoaded } = usePersonalizationContext()
-  const [tempSettings, setTempSettings] = useState(settings)
-  const [isUnsaved, setIsUnsaved] = useState(false)
+  const [activeSection, setActiveSection] = useState<SettingSection>('general')
 
-  // Sync temp settings when saved settings change
-  useEffect(() => {
-    setTempSettings(settings)
-    setIsUnsaved(false)
-  }, [settings])
+  // Form State
+  const [profile, setProfile] = useState({
+    fullName: 'Ananda Affan Fattahila',
+    claudeName: 'Ananda Affan Fattahila',
+    work: 'engineering',
+    preferences: '',
+  })
 
-  // Update temp settings and mark as unsaved
-  const handleTempChange = (key: keyof typeof settings, value: string) => {
-    setTempSettings((prev: typeof settings) => ({ ...prev, [key]: value }))
-    setIsUnsaved(true)
-  }
+  const [notifications, setNotifications] = useState({
+    responseCompletions: false,
+  })
 
-  // Save changes
-  const handleSave = () => {
-    updateSettings(tempSettings)
-    setIsUnsaved(false)
-  }
-
-  // Reset to saved state
-  const handleCancel = () => {
-    setTempSettings(settings)
-    setIsUnsaved(false)
-  }
-
-  // Reset to defaults
-  const handleReset = () => {
-    resetSettings()
-    // tempSettings will be updated by the useEffect when settings change
-    setIsUnsaved(false)
-  }
-
-  // Predefined color options
-  const colorPresets = [
-    { name: 'MII Green', color: '#00765a' },
-    { name: 'Blue', color: '#3b82f6' },
-    { name: 'Purple', color: '#8b5cf6' },
-    { name: 'Red', color: '#ef4444' },
-    { name: 'Orange', color: '#f97316' },
-    { name: 'Pink', color: '#ec4899' },
-    { name: 'Indigo', color: '#6366f1' },
-    { name: 'Teal', color: '#14b8a6' },
-  ]
-
-  if (!isLoaded) {
-    return (
-      <div className="flex-1 p-8 pt-20 md:pt-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-32 mb-8"></div>
-            <div className="h-48 bg-gray-200 rounded"></div>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const [theme, setTheme] = useState<'light' | 'auto' | 'dark'>('light')
 
   return (
-    <div className="flex-1 p-8 pt-20 md:pt-8 max-h-screen overflow-y-scroll" style={{ backgroundColor: 'var(--background)' }}>
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8" style={{ color: 'var(--foreground)' }}>
+    <div className="min-h-screen bg-[#FBFBFB] text-slate-900 font-sans">
+      <div className="max-w-6xl mx-auto px-6 py-12 md:py-20">
+        
+        {/* Page Header */}
+        <h1 className="text-3xl font-serif text-[#333] mb-12 font-medium tracking-tight">
           Settings
         </h1>
 
-        <div className="space-y-6">
-          {/* Personalization Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="h-5 w-5" />
-                Personalization
-              </CardTitle>
-              <CardDescription>
-                Customize the appearance of your chat interface
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Site Name Section */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Type className="h-4 w-4" />
-                  <Label htmlFor="site-name" className="text-sm font-medium">
-                    Site Name
-                  </Label>
-                </div>
-                <div>
-                  <Input
-                    id="site-name"
-                    type="text"
-                    value={tempSettings.siteName}
-                    onChange={(e) => handleTempChange('siteName', e.target.value)}
-                    placeholder="Enter site name"
-                    className="w-full"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This will appear in the header and browser title
-                  </p>
-                </div>
-              </div>
+        <div className="flex flex-col md:flex-row gap-12">
+          
+          {/* Sidebar Navigation */}
+          <aside className="w-full md:w-64 flex-shrink-0">
+            <nav className="flex flex-col gap-1">
+              {NAV_ITEMS.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSection(item.id)}
+                  className={cn(
+                    "text-left px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200",
+                    activeSection === item.id
+                      ? "bg-[#EFECE6] text-slate-900"
+                      : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          </aside>
 
-              {/* Site Icon Section */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4" />
-                  <Label htmlFor="site-icon" className="text-sm font-medium">
-                    Site Icon & Favicon
-                  </Label>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex-shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img 
-                      src={tempSettings.siteIcon} 
-                      alt="Site icon preview" 
-                      className="w-12 h-12 object-contain border rounded p-1"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>'
-                      }}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Input
-                      id="site-icon"
-                      type="url"
-                      value={tempSettings.siteIcon}
-                      onChange={(e) => handleTempChange('siteIcon', e.target.value)}
-                      placeholder="Enter image URL"
-                      className="w-full"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Enter a URL to an image (PNG, JPG, or SVG recommended)
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Primary Color Section */}
-              <div className="space-y-4">
-                <Label htmlFor="primary-color" className="text-sm font-medium">
-                  Primary Color
-                </Label>
-                <div className="space-y-4">
-                  {/* Color Input */}
-                  <div className="flex items-center gap-4">
-                    <div 
-                      className="w-12 h-12 border rounded flex-shrink-0" 
-                      style={{ backgroundColor: tempSettings.primaryColor }}
-                    />
-                    <Input
-                      id="primary-color"
-                      type="color"
-                      value={tempSettings.primaryColor}
-                      onChange={(e) => handleTempChange('primaryColor', e.target.value)}
-                      className="w-20 h-12 p-1 border rounded cursor-pointer"
-                    />
-                    <Input
-                      type="text"
-                      value={tempSettings.primaryColor}
-                      onChange={(e) => handleTempChange('primaryColor', e.target.value)}
-                      placeholder="#000000"
-                      className="flex-1"
-                    />
-                  </div>
+          {/* Main Content Area */}
+          <main className="flex-1 max-w-2xl">
+            {activeSection === 'general' && (
+              <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                
+                {/* Profile Section */}
+                <section className="space-y-6">
+                  <h2 className="text-lg font-semibold text-slate-900">Profile</h2>
                   
-                  {/* Color Presets */}
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-2">Quick presets:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {colorPresets.map((preset) => (
-                        <button
-                          key={preset.name}
-                          onClick={() => handleTempChange('primaryColor', preset.color)}
-                          className={`flex items-center gap-2 px-3 py-2 rounded border text-sm hover:bg-gray-50 transition-colors ${
-                            tempSettings.primaryColor === preset.color ? 'ring-2 ring-blue-500' : ''
-                          }`}
-                          title={`${preset.name} (${preset.color})`}
-                        >
-                          <div 
-                            className="w-4 h-4 rounded border"
-                            style={{ backgroundColor: preset.color }}
-                          />
-                          <span>{preset.name}</span>
-                        </button>
-                      ))}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="fullName" className="text-slate-600 font-normal">Full name</Label>
+                      <div className="flex gap-3">
+                        <Avatar className="w-10 h-10 bg-slate-800 text-white">
+                            <AvatarFallback className="bg-[#333] text-white text-xs font-medium">AA</AvatarFallback>
+                        </Avatar>
+                        <Input 
+                          id="fullName"
+                          value={profile.fullName}
+                          onChange={(e) => setProfile(prev => ({ ...prev, fullName: e.target.value }))}
+                          className="flex-1 bg-white border-slate-200 text-slate-900 focus-visible:ring-slate-400" 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                       <Label htmlFor="claudeName" className="text-slate-600 font-normal">What should Claude call you?</Label>
+                       <Input 
+                          id="claudeName"
+                          value={profile.claudeName}
+                          onChange={(e) => setProfile(prev => ({ ...prev, claudeName: e.target.value }))}
+                          className="bg-white border-slate-200 text-slate-900 focus-visible:ring-slate-400" 
+                        />
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-between pt-4 border-t">
-                <Button
-                  variant="outline"
-                  onClick={handleReset}
-                  className="flex items-center gap-2"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Reset to Default
-                </Button>
-                
-                <div className="flex gap-2">
-                  {isUnsaved && (
-                    <Button variant="outline" onClick={handleCancel}>
-                      Cancel
-                    </Button>
-                  )}
-                  <Button 
-                    onClick={handleSave}
-                    disabled={!isUnsaved}
-                    style={{ 
-                      backgroundColor: isUnsaved ? tempSettings.primaryColor : undefined 
-                    }}
-                  >
-                    Save Changes
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="space-y-2">
+                    <Label className="text-slate-600 font-normal">What best describes your work?</Label>
+                    <Select 
+                      value={profile.work} 
+                      onChange={(e) => setProfile(prev => ({ ...prev, work: e.target.value }))}
+                      className="bg-white border-slate-200 text-slate-900 focus-visible:ring-slate-400"
+                    >
+                      <option value="engineering">Engineering</option>
+                      <option value="design">Design</option>
+                      <option value="product">Product</option>
+                      <option value="marketing">Marketing</option>
+                      <option value="other">Other</option>
+                    </Select>
+                  </div>
 
-          {/* Preview Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Preview</CardTitle>
-              <CardDescription>
-                See how your changes will look
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4 p-4 border rounded-lg">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img 
-                  src={tempSettings.siteIcon} 
-                  alt="Logo preview" 
-                  className="w-8 h-8 object-contain"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>'
-                  }}
-                />
-                <div>
-                  <h3 className="font-medium">{tempSettings.siteName}</h3>
-                  <p className="text-sm text-muted-foreground">Your AI Assistant</p>
-                </div>
-                <div className="ml-auto">
-                  <Button 
-                    size="sm"
-                    style={{ backgroundColor: tempSettings.primaryColor }}
-                  >
-                    Primary Button
-                  </Button>
-                </div>
+                  <div className="space-y-2">
+                     <Label className="text-slate-600 font-normal">
+                       What <span className="underline decoration-slate-300 underline-offset-4">personal preferences</span> should Claude consider in responses?
+                     </Label>
+                     <p className="text-xs text-slate-500">
+                       Your preferences will apply to all conversations, within <a href="#" className="underline">Anthropic's guidelines</a>.
+                     </p>
+                     <Textarea 
+                       placeholder="e.g. ask clarifying questions before giving detailed answers"
+                       value={profile.preferences}
+                       onChange={(e) => setProfile(prev => ({ ...prev, preferences: e.target.value }))}
+                       className="min-h-[120px] bg-white border-slate-200 text-slate-900 focus-visible:ring-slate-400 resize-none p-4"
+                     />
+                  </div>
+                </section>
+
+                <hr className="border-slate-100" />
+
+                {/* Notifications Section */}
+                <section className="space-y-6">
+                  <h2 className="text-lg font-semibold text-slate-900">Notifications</h2>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label className="text-base font-medium text-slate-900">Response completions</Label>
+                      <p className="text-sm text-slate-500 max-w-lg">
+                        Get notified when Claude has finished a response. Most useful for long-running tasks like tool calls and Research.
+                      </p>
+                    </div>
+                    <Switch 
+                      checked={notifications.responseCompletions} 
+                      onCheckedChange={(c) => setNotifications(prev => ({ ...prev, responseCompletions: c }))}
+                    />
+                  </div>
+                </section>
+
+                <hr className="border-slate-100" />
+
+                {/* Appearance Section */}
+                <section className="space-y-6">
+                  <h2 className="text-lg font-semibold text-slate-900">Appearance</h2>
+                  
+                  <div className="space-y-3">
+                    <Label className="text-slate-600 font-normal">Color mode</Label>
+                    <div className="flex gap-4">
+                      {/* Light Mode */}
+                      <ThemeCard 
+                        active={theme === 'light'} 
+                        onClick={() => setTheme('light')}
+                        label="Light" 
+                        preview={<div className="w-full h-full bg-[#FAFAFA] border border-slate-200 flex flex-col p-2 gap-1 rounded-sm"><div className="h-2 w-1/2 bg-slate-200 rounded-full mb-1"></div><div className="h-10 w-full bg-white border border-slate-200 rounded-sm"></div></div>}
+                      />
+                       {/* Auto Mode */}
+                       <ThemeCard 
+                        active={theme === 'auto'} 
+                        onClick={() => setTheme('auto')}
+                        label="Auto" 
+                        preview={<div className="w-full h-full flex rounded-sm overflow-hidden border border-slate-500"><div className="w-1/2 bg-[#FAFAFA] flex flex-col p-2 gap-1"><div className="h-2 w-1/2 bg-slate-200 rounded-full mb-1"></div><div className="h-10 w-full bg-white border border-slate-200 rounded-sm"></div></div><div className="w-1/2 bg-[#2D2D2D] flex flex-col p-2 gap-1"><div className="h-2 w-1/2 bg-slate-600 rounded-full mb-1"></div><div className="h-10 w-full bg-[#3D3D3D] border border-slate-600 rounded-sm"></div></div></div>}
+                      />
+                       {/* Dark Mode */}
+                       <ThemeCard 
+                        active={theme === 'dark'} 
+                        onClick={() => setTheme('dark')}
+                        label="Dark" 
+                        preview={<div className="w-full h-full bg-[#1F1F1F] border border-slate-700 flex flex-col p-2 gap-1 rounded-sm"><div className="h-2 w-1/2 bg-slate-700 rounded-full mb-1"></div><div className="h-10 w-full bg-[#2D2D2D] border border-slate-600 rounded-sm"></div></div>}
+                      />
+                    </div>
+                  </div>
+                </section>
               </div>
-            </CardContent>
-          </Card>
+            )}
+            
+            {activeSection !== 'general' && (
+              <div className="py-20 text-center text-slate-500 animate-in fade-in">
+                <p>This section is under development.</p>
+              </div>
+            )}
+          </main>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Helper Component for Theme Cards
+function ThemeCard({ active, onClick, label, preview }: { active: boolean; onClick: () => void; label: string; preview: React.ReactNode }) {
+  return (
+    <div 
+      className="flex flex-col items-center gap-2 cursor-pointer group"
+      onClick={onClick}
+    >
+      <div className={cn(
+        "w-32 h-20 rounded-lg p-1 transition-all duration-200 border-2",
+        active 
+          ? "border-blue-500 ring-2 ring-blue-200 bg-white" 
+          : "border-transparent hover:bg-slate-100"
+      )}>
+        <div className="w-full h-full rounded overflow-hidden relative">
+            {preview}
+            {active && (
+                <div className="absolute bottom-1 right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <Check className="w-3 h-3 text-white" />
+                </div>
+            )}
+        </div>
+      </div>
+      <span className={cn(
+        "text-sm",
+        active ? "text-slate-900 font-medium" : "text-slate-500"
+      )}>
+        {label}
+      </span>
     </div>
   )
 }

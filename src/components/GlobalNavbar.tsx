@@ -350,7 +350,7 @@ export default function GlobalNavbar({ user }: GlobalNavbarProps) {
         animate={isCollapsed ? "collapsed" : "expanded"}
         variants={sidebarVariants}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="hidden md:flex h-screen flex-col border-r border-[#f0f0f0] bg-[#ffffff] relative z-30 overflow-hidden"
+        className="hidden md:flex h-screen flex-col bg-[#ffffff] relative z-30 overflow-hidden"
       >
         {/* Header */}
         <div className="flex-shrink-0 min-h-[60px] flex items-center justify-between px-3 pt-3 pb-2">
