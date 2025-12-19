@@ -4,7 +4,9 @@ import { useState, useEffect } from "react";
 import { Sparkles, TriangleAlert } from "lucide-react";
 
 type GenerateImageArgs = {
-  prompt: string
+  prompt: string;
+  size: string;
+  style: string;
 }
 
 type GenerateImageResult = string; // URL of generated image
