@@ -1,4 +1,20 @@
-system_prompt = """
+import dotenv
+dotenv.load_dotenv()
+
+required_env = [
+   'PROMPTY_BASE_URL',
+   'PROMPTY_PROJECT_ID',
+   'PROMPTY_API_KEY',
+]
+missing_env = [var for var in required_env if var not in dotenv.dotenv_values()]
+if missing_env:
+   raise EnvironmentError(f"Missing required environment variables: {', '.join(missing_env)}")
+
+import os
+
+from prompty import PromptyClient
+
+FALLBACK_SYSTEM_PROMPT = """
 You are MII Chat, a large language model based on the GPT-5.2 model developed by PT. Mitra Integrasi Informatika - Microsoft AI Division.
 Knowledge cutoff: 2024-06
 Current date: 2025-08-08
@@ -221,3 +237,15 @@ You must:
 - Do not fabricate results from tools that were not called  
 - Always respect tool-specific constraints and libraries  
 """
+
+_prompty_client = None
+def get_prompty_client() -> PromptyClient:
+   """Initialize and return a PromptyClient instance."""
+   global _prompty_client
+   if _prompty_client is None:
+      _prompty_client = PromptyClient(
+         base_url=os.getenv('PROMPTY_BASE_URL'),
+         project_id=os.getenv('PROMPTY_PROJECT_ID'),
+         api_key=os.getenv('PROMPTY_API_KEY')  # Replace with your actual API key
+      )
+   return _prompty_client

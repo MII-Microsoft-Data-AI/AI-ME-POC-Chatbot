@@ -4,7 +4,6 @@ from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, System
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from lib.checkpointer import checkpointer
 
@@ -15,7 +14,7 @@ from langchain_core.messages.utils import (
 
 from .tools import AVAILABLE_TOOLS
 from .model import model
-from .prompt import system_prompt
+from .prompt import FALLBACK_SYSTEM_PROMPT, get_prompty_client
 
 class AgentState(TypedDict):
     """State for the agent graph."""
@@ -69,9 +68,12 @@ def call_model(state: AgentState, config = None) -> Dict[str, List[BaseMessage]]
         end_on=("human", "tool"),
     )
 
-    
+    prompty = get_prompty_client()
+    prompt = prompty.get_prompt('Main Chat Agent')
+    if (prompt is None):
+        prompt = FALLBACK_SYSTEM_PROMPT
 
-    system_msg = SystemMessage(content=system_prompt.strip())
+    system_msg = SystemMessage(content=prompt.strip())
     messages = [system_msg] + state["messages"]
         
     # Bind tools to the model
