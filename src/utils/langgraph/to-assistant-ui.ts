@@ -713,6 +713,29 @@ export function convertLanggraphStateToAssistantUI(
   return buildMessageParentChildRelationships(threadMessages);
 }
 
+// Utility function to load a single Langgraph state JSON
+export function loadFromLanggraphStateJSON(
+  stateEntry: LanggraphStateHistoryEntry
+): Array<{ message: ThreadMessage; parentId: string | null }> {
+  if (!stateEntry[0] || !stateEntry[0].messages) {
+    return [];
+  }
+
+  const checkpoint = stateEntry[0];
+  const timestamp = stateEntry[4];
+  
+  // Process messages to extract tool results and filter out ToolMessages
+  const { processedMessages, toolResults } = processMessagesWithToolResults(checkpoint.messages);
+  
+  // Convert all messages from this state
+  const threadMessages: ThreadMessage[] = processedMessages.map(langchainMsg =>
+    convertLangchainMessageToThreadMessage(langchainMsg, checkpoint, timestamp, toolResults)
+  );
+
+  // Build parent-child relationships
+  return buildMessageParentChildRelationships(threadMessages);
+}
+
 // Utility function to extract conversation history from multiple checkpoints
 export function loadFromLanggraphStateHistoryJSON(
   stateHistory: LanggraphStateHistory

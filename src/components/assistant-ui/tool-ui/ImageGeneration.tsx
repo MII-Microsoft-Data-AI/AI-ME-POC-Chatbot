@@ -4,7 +4,9 @@ import { useState, useEffect } from "react";
 import { Sparkles, TriangleAlert } from "lucide-react";
 
 type GenerateImageArgs = {
-  prompt: string
+  prompt: string;
+  size: string;
+  style: string;
 }
 
 type GenerateImageResult = string; // URL of generated image
@@ -79,8 +81,13 @@ const ImageGenerationFailed = () => {
 
 export const GenerateImageUI = makeAssistantToolUI<GenerateImageArgs, GenerateImageResult>({
   toolName: "generate_image", // Must match backend tool name
-  render: ({ result, status }) => {
+  render: (data) => {
+    console.log(data)
+    const { result, status } = data;
     // Tool outputs stream in; `result` will be `undefined` until the tool resolves.
+
+    console.log("Image Generation Tool Status:", status);
+    console.log("Image Generation Tool Result:", result);
 
     if (result) {
       return <AnimatedImage
