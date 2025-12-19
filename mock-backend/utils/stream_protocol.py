@@ -10,7 +10,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langchain_core.messages import AIMessageChunk, AIMessage, ToolMessage, HumanMessage
 
 
-DEBUG_STREAM = True
+DEBUG_STREAM = False
 
 
 def handle_tool_message(msg: ToolMessage):

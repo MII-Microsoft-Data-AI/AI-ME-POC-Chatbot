@@ -32,6 +32,7 @@ isodate==0.7.2
 jiter==0.11.0
 jsonpatch==1.33
 jsonpointer==3.0.0
+kaenova-prompty==20251102.15.9
 langchain==0.3.27
 langchain-azure-dynamic-sessions==0.2.0
 langchain-community==0.3.29
