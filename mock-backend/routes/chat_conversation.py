@@ -208,7 +208,7 @@ async def get_chat_history(_: Annotated[str, Depends(get_authenticated_user)], u
     try:
         graph = get_graph()
         # Get the conversation state from the checkpointer
-        states_generator = graph.get_state_history(config={"configurable": {"thread_id": conversation_id}})
+        states_generator = graph.get_state(config={"configurable": {"thread_id": conversation_id}})
         states = [x for x in states_generator]
 
         json_dumps = dumps(states)

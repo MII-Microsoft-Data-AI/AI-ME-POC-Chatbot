@@ -2,7 +2,7 @@
 
 import { CompositeAttachmentAdapter, SimpleImageAttachmentAdapter, ThreadHistoryAdapter, ThreadMessage } from "@assistant-ui/react";
 import { formatRelativeTime } from "@/utils/date-utils";
-import { loadFromLanggraphStateHistoryJSON } from "@/utils/langgraph/to-assistant-ui";
+import { loadFromLanggraphStateHistoryJSON, loadFromLanggraphStateJSON } from "@/utils/langgraph/to-assistant-ui";
 import { useCustomDataStreamRuntime } from "@/utils/custom-data-stream-runtime";
 import type { ChatMode } from "@/components/assistant-ui/thread";
 
@@ -79,7 +79,10 @@ export const LoadConversationHistory = async (conversationId: string): Promise<L
     }
 
     const resMsg = await response.json();
-    const messageData = loadFromLanggraphStateHistoryJSON(resMsg);
+    console.log("Fetched conversation history response:", resMsg);
+    const messageData = loadFromLanggraphStateJSON(resMsg);
+
+    console.log("Loaded conversation history:", messageData);
 
     // @ts-expect-error // TypeScript is not able to infer the type correctly here
     return messageData;
