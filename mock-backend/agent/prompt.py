@@ -1,16 +1,16 @@
 import dotenv
 dotenv.load_dotenv()
-
 required_env = [
    'PROMPTY_BASE_URL',
    'PROMPTY_PROJECT_ID',
    'PROMPTY_API_KEY',
 ]
-missing_env = [var for var in required_env if var not in dotenv.dotenv_values()]
-if missing_env:
-   raise EnvironmentError(f"Missing required environment variables: {', '.join(missing_env)}")
 
 import os
+
+missing_env = [var for var in required_env if not os.getenv(var)]
+if missing_env:
+   raise EnvironmentError(f"Missing required environment variables: {', '.join(missing_env)}")
 
 from prompty import PromptyClient
 
