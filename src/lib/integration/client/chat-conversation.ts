@@ -1,9 +1,10 @@
 'use client'
 
-import { CompositeAttachmentAdapter, SimpleImageAttachmentAdapter, ThreadHistoryAdapter, ThreadMessage } from "@assistant-ui/react";
+import { AssistantCloud, CompositeAttachmentAdapter, SimpleImageAttachmentAdapter, ThreadHistoryAdapter, ThreadMessage } from "@assistant-ui/react";
 import { formatRelativeTime } from "@/utils/date-utils";
 import { loadFromLanggraphStateHistoryJSON, loadFromLanggraphStateJSON } from "@/utils/langgraph/to-assistant-ui";
 import { useCustomDataStreamRuntime } from "@/utils/custom-data-stream-runtime";
+import { useCustomLangGraphDataStreamRuntime } from "@/utils/custom-langgraph-data-stream-runtime";
 import type { ChatMode } from "@/components/assistant-ui/thread";
 
 const BaseAPIPath = "/api/be"
@@ -47,7 +48,9 @@ export async function GetLastConversationId(): Promise<string | null> {
 // You need to provide the conversationId and historyAdapter
 // The conversationId is obtained from the URL parameters
 // The historyAdapter is used to load and append messages to the thread
-export const ChatWithConversationIDAPIRuntime = (conversationId: string, historyAdapter: ThreadHistoryAdapter, mode: ChatMode = 'chat') => useCustomDataStreamRuntime({
+// Uses LangGraph-backed endpoint at /conversations/{id}/chat
+export const ChatWithConversationIDAPIRuntime = (conversationId: string, historyAdapter: ThreadHistoryAdapter, mode: ChatMode = 'chat') => 
+  useCustomLangGraphDataStreamRuntime({
   api: `${BaseAPIPath}/conversations/${conversationId}/chat`,
   body: { mode }, // Pass mode to backend
   adapters: {

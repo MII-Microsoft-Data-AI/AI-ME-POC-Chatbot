@@ -8,6 +8,16 @@ from lib.auth import get_authenticated_user
 from utils.stream_protocol import generate_stream
 from utils.message_conversion import from_assistant_ui_contents_to_langgraph_contents
 
+from assistant_stream.serialization import DataStreamResponse
+from assistant_stream import RunController, create_run
+from assistant_stream.modules.langgraph import append_langgraph_event, get_tool_call_subgraph_state
+
+from langgraph.graph import StateGraph, END
+from langgraph.graph.state import CompiledStateGraph
+from langgraph.graph import add_messages
+from langgraph.prebuilt import ToolNode
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage, BaseMessage
+
 from typing import Annotated
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
@@ -219,6 +229,46 @@ async def get_chat_history(_: Annotated[str, Depends(get_authenticated_user)], u
         print(e)
         raise HTTPException(status_code=500, detail=f"Failed to fetch chat history: {str(e)}")
 
+from typing import Dict, Any, List, Optional, Union, Sequence, Annotated
+from pydantic import BaseModel, Field
+
+class MessagePart(BaseModel):
+    """A part of a user message."""
+    type: str = Field(..., description="The type of message part")
+    text: Optional[str] = Field(None, description="Text content")
+    image: Optional[str] = Field(None, description="Image URL or data")
+
+
+class UserMessage(BaseModel):
+    """A user message."""
+    role: str = Field(default="user", description="Message role")
+    parts: List[MessagePart] = Field(..., description="Message parts")
+
+
+class AddMessageCommand(BaseModel):
+    """Command to add a new message to the conversation."""
+    type: str = Field(default="add-message", description="Command type")
+    message: UserMessage = Field(..., description="User message")
+
+
+class AddToolResultCommand(BaseModel):
+    """Command to add a tool result to the conversation."""
+    type: str = Field(default="add-tool-result", description="Command type")
+    toolCallId: str = Field(..., description="ID of the tool call")
+    result: Dict[str, Any] = Field(..., description="Tool execution result")
+
+
+class ChatRequest(BaseModel):
+    """Request payload for the chat endpoint."""
+    commands: List[Union[AddMessageCommand, AddToolResultCommand]] = Field(
+        ..., description="List of commands to execute"
+    )
+    system: Optional[str] = Field(None, description="System prompt")
+    tools: Optional[Dict[str, Any]] = Field(None, description="Available tools")
+    runConfig: Optional[Dict[str, Any]] = Field(None, description="Run configuration")
+    state: Optional[Dict[str, Any]] = Field(None, description="State")
+
+
 @chat_conversation_route.post("/conversations/{conversation_id}/chat")
 async def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None, conversation_id: str = "", request: ChatRequest = None):
     """Chat in a specific conversation."""
@@ -240,55 +290,87 @@ async def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], 
     
     last_message = request.messages[-1] if request.messages else ""
     
-    # Route based on mode (same as /chat endpoint)
-    if request.mode == "image":
-        # Extract text from message content
-        message_content = last_message.get('content', '')
-        if isinstance(message_content, list):
-            prompt = ""
-            for item in message_content:
-                if isinstance(item, dict) and item.get('type') == 'text':
-                    prompt = item.get('text', '')
-                    break
-        else:
-            prompt = str(message_content)
-        
-        if not prompt:
-            return {"error": "No prompt provided for image generation"}
-        
-        # Generate image using DALL-E
-        return StreamingResponse(
-            generate_image_stream(prompt, conversation_id),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Content-Type": "text/plain; charset=utf-8",
-                "Connection": "keep-alive",
-                "x-vercel-ai-data-stream": "v1",
-                "x-vercel-ai-ui-message-stream": "v1"
-            }
-        )
-    else:
-        # Normal chat mode - use LangGraph
-        last_message_langgraph_content = from_assistant_ui_contents_to_langgraph_contents(last_message['content'])
-        input_message = [{
-            "role": "user",
-            "content": last_message_langgraph_content
-        }]
+    last_message_langgraph_content = from_assistant_ui_contents_to_langgraph_contents(last_message['content'])
+    # api_input_message = [{
+    #     "role": "user",
+    #     "content": last_message_langgraph_content
+    # }]
 
-        graph = get_graph()
+    graph = get_graph()
 
-        return StreamingResponse(
-            generate_stream(graph, input_message, conversation_id),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Content-Type": "text/plain; charset=utf-8",
-                "Connection": "keep-alive",
-                "x-vercel-ai-data-stream": "v1",
-                "x-vercel-ai-ui-message-stream": "v1"
-            }
-        )
+    async def run_callback(controller: RunController):
+        """Callback function for the run controller."""
+        # Initialize controller state if needed
+        if controller.state is None:
+            controller.state = {}
+        if "messages" not in controller.state:
+            controller.state["messages"] = []
+
+        input_messages = []
+
+        # Process commands
+        for command in request.commands:
+            if command.type == "add-message":
+                # Extract text from parts
+                text_parts = [
+                    part.text for part in command.message.parts
+                    if part.type == "text" and part.text
+                ]
+                if text_parts:
+                    input_messages.append(HumanMessage(content=last_message_langgraph_content))
+            elif command.type == "add-tool-result":
+                # Handle tool results
+                input_messages.append(ToolMessage(
+                    content=str(command.result),
+                    tool_call_id=command.toolCallId
+                ))
+
+        # Add messages to controller state
+        for message in input_messages:
+            controller.state["messages"].append(message.model_dump())
+
+        # Create initial state for LangGraph
+        input_state = {"messages": input_messages}
+
+        # Stream with subgraph support
+        async for namespace, event_type, chunk in graph.astream(
+            input_state,
+            stream_mode=["messages", "updates"],
+            config={"configurable": {"thread_id": conversation_id}},
+            subgraphs=True
+        ):
+            state = get_tool_call_subgraph_state(
+                controller,
+                subgraph_node="tools",
+                namespace=namespace,
+                artifact_field_name="subgraph_state",
+                default_state={}
+            )
+            # Append the event normally
+            append_langgraph_event(
+                state,
+                namespace,
+                event_type,
+                chunk
+            )
+
+    # Create streaming response using assistant-stream
+    stream = create_run(run_callback, state=None)
+
+    return DataStreamResponse(stream)
+
+    return StreamingResponse(
+        generate_stream(graph, input_message, conversation_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Content-Type": "text/plain; charset=utf-8",
+            "Connection": "keep-alive",
+            "x-vercel-ai-data-stream": "v1",
+            "x-vercel-ai-ui-message-stream": "v1"
+        }
+    )
+
 @chat_conversation_route.delete("/conversations/{conversation_id}")
 async def delete_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None, conversation_id: str = ""):
     """Delete a conversation."""

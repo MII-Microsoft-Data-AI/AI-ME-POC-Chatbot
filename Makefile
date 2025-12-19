@@ -114,7 +114,7 @@ langgraph-setup:
 
 langgraph-install:
 	@echo "📥 Installing backend dependencies..."
-	cd mock-backend && uv sync
+	cd mock-backend && uv sync && uv pip install -r requirements.txt
 	@echo "✅ Backend dependencies installed"
 
 # Run database migrations

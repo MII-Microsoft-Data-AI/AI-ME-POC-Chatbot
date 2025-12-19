@@ -9,6 +9,8 @@ import { ConversationContent } from '@/components/features/chat/ConversationCont
 import { ErrorState } from '@/components/features/chat/ErrorState'
 import { ChatLayout } from '@/components/features/chat/ChatLayout'
 import { GenerateImageUI } from '@/components/assistant-ui/tool-ui/ImageGeneration'
+import { useLangGraphRuntime } from '@assistant-ui/react-langgraph'
+import { MyRuntimeProvider } from './runtime'
 
 function ConversationPage() {
   const params = useParams()
@@ -19,26 +21,23 @@ function ConversationPage() {
 
   // History loading
   const { historyAdapter, isLoadingHistory, error } = useConversationHistory(conversationId)
-
-  // Create runtime with conversation ID
-  const runtime = ChatWithConversationIDAPIRuntime(conversationId, historyAdapter, mode)
-
+  
   return (
     <ChatLayout>
-      <AssistantRuntimeProvider runtime={runtime}>
-        {error ? (
+        <MyRuntimeProvider>
+        {/* {error ? (
           <ErrorState error={error} onRetry={() => window.location.reload()} />
         ) : (
+        )} */}
           <>
             <GenerateImageUI />
             <ConversationContent
-              mode={mode}
+              mode={'chat'}
               onModeChange={setMode}
-              isLoading={isLoadingHistory}
+              isLoading={false}
               />
           </>
-        )}
-      </AssistantRuntimeProvider>
+        </MyRuntimeProvider>
     </ChatLayout>
   )
 }
