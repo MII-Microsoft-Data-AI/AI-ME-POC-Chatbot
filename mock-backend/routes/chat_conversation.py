@@ -90,7 +90,6 @@ async def generate_image_stream(prompt: str, conversation_id: str):
 class CreateConversationRequest(BaseModel):
     conversationId: str | None = None
     initialChat: str | None = None
-    attachmentsInternalUrl: list[str] = []
 
 @chat_conversation_route.post("/create-conversation")
 async def create_new_conversation(request: CreateConversationRequest | None = None, _ = Depends(get_authenticated_user), userid: Annotated[str | None, Header()] = None):
@@ -114,25 +113,6 @@ async def create_new_conversation(request: CreateConversationRequest | None = No
     
     t2 = time.time()
     db_manager.create_conversation(conversation_id, request.initialChat, userid)
-
-    human_content =[
-        {"type": "text", "text": request.initialChat},
-        *[
-            {"type": "image_url", "image_url": {"url": attachment_url}}
-            for attachment_url in request.attachmentsInternalUrl
-        ]
-    ]
-    
-    print("Himan Content", human_content)
-
-    graph.update_state(
-        config={"configurable": {"thread_id": conversation_id}},
-        values={
-            "messages": [
-                HumanMessage(content=human_content)
-            ]
-        }
-    )
     print(f"  🔹 DB create: {(time.time() - t2)*1000:.0f}ms")
     
     print(f"  ✅ Total: {(time.time() - start)*1000:.0f}ms")

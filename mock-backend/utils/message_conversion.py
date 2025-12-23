@@ -81,12 +81,11 @@ def from_assistant_ui_contents_to_langgraph_contents(message: list[any]) -> dict
             continue
 
         if content.get("type") == "image":
-            file_data = decode_file_attachment(content.get("image"))
             langgraph_content = {
                 "type": "image_url",
-                "image_url": {
-                    "url": f"data:{file_data['mimetype']};base64,{file_data['base64data']}",
-                },
+                "image_url" : {
+                    "url": content.get("image", "")
+                }
             }
             langgraph_contents.append(langgraph_content)
             continue

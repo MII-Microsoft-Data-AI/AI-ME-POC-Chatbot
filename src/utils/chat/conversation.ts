@@ -19,5 +19,5 @@ export async function withTimeout<T>(
 
 export const CONVERSATION_CONSTANTS = {
   CREATION_TIMEOUT_MS: 30000, // 30 seconds
-  SEND_DELAY_MS: 100, // Delay before sending pending message
+  SEND_DELAY_MS: 300, // Delay before sending pending message
 } as const

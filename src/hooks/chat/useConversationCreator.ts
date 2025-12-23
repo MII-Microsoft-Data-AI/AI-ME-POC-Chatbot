@@ -10,6 +10,19 @@ import {
   CONVERSATION_CONSTANTS,
 } from '@/utils/chat/conversation'
 
+// Utility function to convert File to base64
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      resolve(result)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 // Hook untuk handle conversation creation flow
 // Override composer.send untuk create conversation dulu sebelum redirect
 // Flow: generate ID -> create conversation (30s timeout) -> save message -> redirect
@@ -30,32 +43,12 @@ export function useConversationCreator(mode: ChatMode) {
         // Get the message from composer
         const composerState = threadRuntime.composer.getState()
         const message = composerState.text
-        const attachmentInternalUrl: string[] = [] 
-        
-        // Upload attachments in parallel
-        const uploadPromises = composerState.attachments
-          .filter(att => att.file)
-          .map(async (att) => {
-            const formData = new FormData()
-            formData.append('file', att.file!)
-            formData.append('type', 'image')
-            
-            const response = await fetch('/api/be/api/v1/attachments/', {
-              method: 'POST',
-              body: formData,
-            })
-            
-            if (!response.ok) {
-              throw new Error(`Failed to upload attachment: ${response.statusText}`)
-            }
-            
-            const data = await response.json()
-            return data.url
-          })
-        
-        if (uploadPromises.length > 0) {
-          const uploadedUrls = await Promise.all(uploadPromises)
-          attachmentInternalUrl.push(...uploadedUrls)
+        const attachmentFile: File[] = [] 
+
+        for (const attachment of composerState.attachments) {
+          if (attachment.file) {
+            attachmentFile.push(attachment.file)
+          }
         }
 
         if (!message.trim()) return
@@ -69,7 +62,7 @@ export function useConversationCreator(mode: ChatMode) {
 
         // Create conversation with timeout
         const createdId = await withTimeout(
-          CreateConversation(conversationId, message, attachmentInternalUrl),
+          CreateConversation(conversationId, message),
           CONVERSATION_CONSTANTS.CREATION_TIMEOUT_MS,
           'Conversation creation timeout (30s)'
         )
@@ -81,7 +74,7 @@ export function useConversationCreator(mode: ChatMode) {
         console.log('Conversation created successfully:', createdId)
 
         // Store message in sessionStorage to send after redirect
-        savePendingMessage(message, mode)
+        savePendingMessage(message, mode, attachmentFile)
 
         // Redirect to conversation page
         router.push(`/chat/${createdId}`)

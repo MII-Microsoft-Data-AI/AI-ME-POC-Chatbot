@@ -15,12 +15,12 @@ export function usePendingMessage({ isLoading, onModeChange }: UsePendingMessage
   const threadRuntime = useThreadRuntime()
   const [hasSentPendingMessage, setHasSentPendingMessage] = useState(false)
 
-  useEffect(() => {
+  async function fetchPendingMessage() {
     if (!threadRuntime) return
     if (isLoading) return // Wait for history to load first
     if (hasSentPendingMessage) return // Only send once
 
-    const pending = getPendingMessage()
+    const pending = await getPendingMessage()
 
     if (pending) {
       // Clear from sessionStorage
@@ -31,15 +31,30 @@ export function usePendingMessage({ isLoading, onModeChange }: UsePendingMessage
         onModeChange(pending.mode)
       }
 
-      // Wait a bit for runtime to be fully ready after history load
+      
       setTimeout(() => {
+        if (pending.attachmentFile.length > 0) {
+          for (const file of pending.attachmentFile) {
+            threadRuntime.composer.addAttachment(file)
+          }
+        }
+
+        // Wait a bit for runtime to be fully ready after history load
         // Set the message in composer
         threadRuntime.composer.setText(pending.message)
-        // Send it
-        threadRuntime.composer.send()
-        setHasSentPendingMessage(true)
+
+        // Wait a bit before sending to ensure attachments are processed
+        setTimeout(() => {
+            // Send it
+            threadRuntime.composer.send()
+            setHasSentPendingMessage(true)
+        },CONVERSATION_CONSTANTS.SEND_DELAY_MS)
       }, CONVERSATION_CONSTANTS.SEND_DELAY_MS)
     }
+  }
+
+  useEffect(() => {
+    fetchPendingMessage()
   }, [threadRuntime, isLoading, hasSentPendingMessage, onModeChange])
 
   return {
