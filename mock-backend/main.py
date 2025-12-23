@@ -35,6 +35,7 @@ app.add_middleware(
 # Add timing middleware for debugging
 import time
 from fastapi import Request
+from lib.auth import verify_credentials
 
 @app.middleware("http")
 async def add_timing_header(request: Request, call_next):
@@ -90,6 +91,7 @@ async def health():
 from routes.chat_conversation import chat_conversation_route
 from routes.file_indexing import file_indexing_route
 from routes.image_generation import image_generation_route
+from routes.attachment import attachment_routes
 
 app.include_router(
     chat_conversation_route
@@ -105,6 +107,13 @@ app.include_router(
     image_generation_route,
     prefix="/api/v1",
     tags=["image-generation"]
+)
+
+app.include_router(
+    attachment_routes,
+    prefix="/api/v1/attachments",
+    tags=["attachments"],
+    dependencies=[Depends(verify_credentials)]
 )
 
 if __name__ == "__main__":

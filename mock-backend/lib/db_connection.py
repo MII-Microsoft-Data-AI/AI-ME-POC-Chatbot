@@ -16,6 +16,7 @@ class CosmosDBConnection:
         # Container names
         self.conversations_container = "conversations"
         self.files_container = "files"
+        self.attachments_container = "attachments"
         
         # Client instance
         self._client: Optional[CosmosClient] = None
@@ -45,10 +46,16 @@ class CosmosDBConnection:
                 id=self.files_container,
                 partition_key=PartitionKey(path="/userid")
             )
+
+            # Create attachments container with userid as partition key
+            await self._database.create_container_if_not_exists(
+                id=self.attachments_container,
+                partition_key=PartitionKey(path="/userid")
+            )
             
             print("✅ Cosmos DB client initialized")
             print(f"   Database: {self.database_name}")
-            print(f"   Containers: {self.conversations_container}, {self.files_container}")
+            print(f"   Containers: {self.conversations_container}, {self.files_container}, {self.attachments_container}")
     
     async def close_cosmos_client(self):
         """Close Cosmos DB client."""
@@ -71,6 +78,12 @@ class CosmosDBConnection:
         if not self._files_container:
             raise RuntimeError("Cosmos DB client not initialized. Call init_cosmos_client() first.")
         return self._files_container
+    
+    def get_attachments_container(self):
+        """Get attachments container."""
+        if not self._database:
+            raise RuntimeError("Cosmos DB client not initialized. Call init_cosmos_client() first.")
+        return self._database.get_container_client(self.attachments_container)
 
 # Global database connection instance
 db_connection = CosmosDBConnection()

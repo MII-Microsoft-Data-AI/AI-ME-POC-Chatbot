@@ -1,6 +1,6 @@
 """Database models and operations for conversation and file metadata - Cosmos DB."""
 import time
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict, Any
 from dataclasses import dataclass, asdict
 from lib.db_connection import db_connection
 from azure.cosmos.exceptions import CosmosResourceNotFoundError
@@ -29,6 +29,16 @@ class FileMetadata:
     error_message: Optional[str] = None
     workflow_id: Optional[str] = None  # orchestration workflow ID
 
+@dataclass
+class Attachment:
+    """Attachment model. Abstraction layer over Azure Blob Storage for langgraph file ingestion in a chat conversation."""
+    id: str # Must be a random long string
+    userid: str
+    filename: str
+    blob_name: str # Azure blob storage name
+    type: str # File type/MIME type
+    created_at: int  # epoch timestamp
+    metadata: Optional[Dict[str, Any]] = None  # JSON metadata
 
 class DatabaseManager:
     """Async database manager for conversation and file metadata using Cosmos DB."""
@@ -353,6 +363,158 @@ class DatabaseManager:
         try:
             await container.read_item(
                 item=file_id,
+                partition_key=userid
+            )
+            return True
+        except CosmosResourceNotFoundError:
+            return False
+    
+    # Attachment operations
+    async def create_attachment(self, attachment_id: str, userid: str, filename: str, blob_name: str, attachment_type: str, metadata: Optional[Dict[str, Any]] = None) -> Attachment:
+        """Create a new attachment."""
+        created_at = int(time.time())
+        
+        container = db_connection.get_attachments_container()
+        
+        document = {
+            "id": attachment_id,
+            "userid": userid,
+            "filename": filename,
+            "blob_name": blob_name,
+            "type": attachment_type,
+            "created_at": created_at,
+            "metadata": metadata
+        }
+        
+        await container.create_item(body=document)
+        
+        return Attachment(
+            id=attachment_id,
+            userid=userid,
+            filename=filename,
+            blob_name=blob_name,
+            type=attachment_type,
+            created_at=created_at,
+            metadata=metadata
+        )
+    
+    async def get_attachment(self, attachment_id: str, userid: str) -> Optional[Attachment]:
+        """Get attachment by ID."""
+        container = db_connection.get_attachments_container()
+        
+        try:
+            item = await container.read_item(
+                item=attachment_id,
+                partition_key=userid
+            )
+            
+            return Attachment(
+                id=item['id'],
+                userid=item['userid'],
+                filename=item['filename'],
+                blob_name=item['blob_name'],
+                type=item['type'],
+                created_at=item['created_at'],
+                metadata=item.get('metadata')
+            )
+        except CosmosResourceNotFoundError:
+            return None
+    
+    async def get_user_attachments(self, userid: str) -> List[Attachment]:
+        """Get all attachments for a user, ordered by created_at descending."""
+        container = db_connection.get_attachments_container()
+        
+        query = "SELECT * FROM c WHERE c.userid = @userid ORDER BY c.created_at DESC"
+        parameters = [{"name": "@userid", "value": userid}]
+        
+        items = container.query_items(
+            query=query,
+            parameters=parameters,
+            partition_key=userid
+        )
+        
+        attachments = []
+        async for item in items:
+            attachments.append(Attachment(
+                id=item['id'],
+                userid=item['userid'],
+                filename=item['filename'],
+                blob_name=item['blob_name'],
+                type=item['type'],
+                created_at=item['created_at'],
+                metadata=item.get('metadata')
+            ))
+        
+        return attachments
+    
+    async def update_attachment_metadata(self, attachment_id: str, userid: str, metadata: Optional[Dict[str, Any]]) -> bool:
+        """Update attachment metadata."""
+        container = db_connection.get_attachments_container()
+        
+        try:
+            # Read the item first
+            item = await container.read_item(
+                item=attachment_id,
+                partition_key=userid
+            )
+            
+            # Update the metadata field
+            item['metadata'] = metadata
+            
+            # Replace the item
+            await container.replace_item(
+                item=attachment_id,
+                body=item
+            )
+            
+            return True
+        except CosmosResourceNotFoundError:
+            return False
+    
+    async def update_attachment_type(self, attachment_id: str, userid: str, attachment_type: str) -> bool:
+        """Update attachment type."""
+        container = db_connection.get_attachments_container()
+        
+        try:
+            # Read the item first
+            item = await container.read_item(
+                item=attachment_id,
+                partition_key=userid
+            )
+            
+            # Update the type field
+            item['type'] = attachment_type
+            
+            # Replace the item
+            await container.replace_item(
+                item=attachment_id,
+                body=item
+            )
+            
+            return True
+        except CosmosResourceNotFoundError:
+            return False
+    
+    async def delete_attachment(self, attachment_id: str, userid: str) -> bool:
+        """Delete an attachment."""
+        container = db_connection.get_attachments_container()
+        
+        try:
+            await container.delete_item(
+                item=attachment_id,
+                partition_key=userid
+            )
+            return True
+        except CosmosResourceNotFoundError:
+            return False
+    
+    async def attachment_exists(self, attachment_id: str, userid: str) -> bool:
+        """Check if an attachment exists."""
+        container = db_connection.get_attachments_container()
+        
+        try:
+            await container.read_item(
+                item=attachment_id,
                 partition_key=userid
             )
             return True
