@@ -5,13 +5,14 @@ import { formatRelativeTime } from "@/utils/date-utils";
 import { loadFromLanggraphStateHistoryJSON, loadFromLanggraphStateJSON } from "@/utils/langgraph/to-assistant-ui";
 import { useCustomDataStreamRuntime } from "@/utils/custom-data-stream-runtime";
 import type { ChatMode } from "@/components/assistant-ui/thread";
+import { VisionImageAdapter } from "@/utils/chat/attachment-adapter";
 
 const BaseAPIPath = "/api/be"
 
 // Attachments Handler
 // For now, we only handle images -kaenova
 const CompositeAttachmentsAdapter = new CompositeAttachmentAdapter([
-  new SimpleImageAttachmentAdapter(),
+  new VisionImageAdapter(),
 ])
 
 // First Chat API Runtime (without conversation ID parameters)

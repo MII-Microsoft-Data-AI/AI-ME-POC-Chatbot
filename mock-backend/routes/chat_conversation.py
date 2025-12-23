@@ -96,6 +96,7 @@ async def create_new_conversation(request: CreateConversationRequest | None = No
     """Create a new conversation and return its ID."""
     import time
     start = time.time()
+    graph = get_graph()
     
     if not userid:
         return {"error": "Missing userid header"}
@@ -111,7 +112,7 @@ async def create_new_conversation(request: CreateConversationRequest | None = No
     print(f"  🔹 UUID gen: {(time.time() - t1)*1000:.0f}ms")
     
     t2 = time.time()
-    await db_manager.create_conversation(conversation_id, request.initialChat, userid)
+    db_manager.create_conversation(conversation_id, request.initialChat, userid)
     print(f"  🔹 DB create: {(time.time() - t2)*1000:.0f}ms")
     
     print(f"  ✅ Total: {(time.time() - start)*1000:.0f}ms")
@@ -132,7 +133,7 @@ async def get_last_conversation_id(_: Annotated[str, Depends(get_authenticated_u
         return {"error": "Missing userid header"}
     
     # Fetch the last conversation ID for the user from the database
-    last_conversation_id = await db_manager.get_last_conversation_id(userid)
+    last_conversation_id = db_manager.get_last_conversation_id(userid)
 
     return {
         "userId": userid,
@@ -146,7 +147,7 @@ async def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], 
         return {"error": "Missing userid header"}
 
     # Fetch list of conversations for the user from the database
-    conversations = await db_manager.get_user_conversations(userid)
+    conversations = db_manager.get_user_conversations(userid)
 
     graph = get_graph()
     
@@ -201,7 +202,7 @@ async def get_chat_history(_: Annotated[str, Depends(get_authenticated_user)], u
         return {"error": "Missing userid header"}
     
     # Check if the conversation exists and belongs to the user
-    if not await db_manager.conversation_exists(conversation_id, userid):
+    if not db_manager.conversation_exists(conversation_id, userid):
         raise HTTPException(status_code=404, detail="Conversation not found")
     
     # Fetch chat history for the conversation from LangGraph state
@@ -231,7 +232,7 @@ async def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], 
 
 
     # Check if the conversation exists and belongs to the user
-    if not await db_manager.conversation_exists(conversation_id, userid):
+    if not db_manager.conversation_exists(conversation_id, userid):
         raise HTTPException(status_code=404, detail="Conversation not found")
     
     # Convert the input message 
@@ -297,7 +298,7 @@ async def delete_conversation(_: Annotated[str, Depends(get_authenticated_user)]
         return {"error": "Missing userid header"}
 
     # Delete the conversation from the database
-    deleted = await db_manager.delete_conversation(conversation_id, userid)
+    deleted = db_manager.delete_conversation(conversation_id, userid)
     
     if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -311,12 +312,12 @@ async def pin_conversation(_: Annotated[str, Depends(get_authenticated_user)], u
     if not userid:
         return {"error": "Missing userid header"}
     
-    existing_data = await db_manager.get_conversation(conversation_id, userid)
+    existing_data = db_manager.get_conversation(conversation_id, userid)
     if not existing_data:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Pin or unpin the conversation in the database
-    updated = await db_manager.pin_conversation(conversation_id, userid, not existing_data.is_pinned)
+    updated = db_manager.pin_conversation(conversation_id, userid, not existing_data.is_pinned)
     
     if not updated:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -338,12 +339,12 @@ async def rename_conversation(_: Annotated[str, Depends(get_authenticated_user)]
     if not new_title:
         return {"error": "Missing new_title in request body"}
 
-    existing_data = await db_manager.get_conversation(conversation_id, userid)
+    existing_data = db_manager.get_conversation(conversation_id, userid)
     if not existing_data:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Rename the conversation in the database
-    updated = await db_manager.rename_conversation(conversation_id, userid, new_title)
+    updated = db_manager.rename_conversation(conversation_id, userid, new_title)
     
     if not updated:
         raise HTTPException(status_code=404, detail="Conversation not found")

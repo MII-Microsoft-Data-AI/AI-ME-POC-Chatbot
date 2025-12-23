@@ -4,6 +4,7 @@ export type ChatMode = 'chat' | 'image'
 export interface PendingMessage {
   message: string
   mode: ChatMode
+  attachmentFile: File[]
 }
 
 export interface ConversationCreationResult {
