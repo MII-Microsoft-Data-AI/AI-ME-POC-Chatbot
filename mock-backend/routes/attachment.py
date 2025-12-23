@@ -32,7 +32,7 @@ class AttachmentDetailResponse(BaseModel):
     type: str
     metadata: Optional[Dict[str, Any]] = None
 
-@attachment_routes.post("/", response_model=AttachmentUploadResponse)
+@attachment_routes.post("", response_model=AttachmentUploadResponse)
 async def upload_attachment(
     file: UploadFile = File(...),
     userid: str | None = Header(None)
@@ -68,7 +68,7 @@ async def upload_attachment(
         upload_file_to_blob(file_content, blob_name)
         
         # Add to attachment database record
-        await db_manager.create_attachment(
+        db_manager.create_attachment(
             attachment_id=attachment_id,
             userid=userid,
             filename=file.filename or "unknown",
@@ -95,7 +95,7 @@ async def upload_attachment(
 
 
 @attachment_routes.get("/{attachment_id}", response_model=AttachmentDetailResponse)
-async def get_attachment_by_id(
+def get_attachment_by_id(
     attachment_id: str,
     userid: str | None = Header(None)
 ):
@@ -117,7 +117,7 @@ async def get_attachment_by_id(
     
     try:
         # Get from database
-        attachment = await db_manager.get_attachment(attachment_id, userid)
+        attachment = db_manager.get_attachment(attachment_id)
         
         if not attachment:
             raise HTTPException(
@@ -147,7 +147,7 @@ async def get_attachment_by_id(
         )
 
 
-@attachment_routes.get("/")
+@attachment_routes.get("")
 async def get_all_attachments(
     userid: str | None = Header(None)
 ):
@@ -167,7 +167,7 @@ async def get_all_attachments(
         )
     
     try:
-        attachments = await db_manager.get_user_attachments(userid)
+        attachments = db_manager.get_user_attachments(userid)
         
         return {
             "userid": userid,
@@ -217,7 +217,7 @@ async def update_attachment_metadata(
     
     try:
         # Verify attachment exists
-        attachment = await db_manager.get_attachment(attachment_id, userid)
+        attachment = await db_manager.get_attachment(attachment_id)
         
         if not attachment:
             raise HTTPException(
@@ -229,7 +229,7 @@ async def update_attachment_metadata(
         await db_manager.update_attachment_metadata(attachment_id, userid, metadata)
         
         # Get updated attachment
-        updated_attachment = await db_manager.get_attachment(attachment_id, userid)
+        updated_attachment = await db_manager.get_attachment(attachment_id)
         blob_url = get_file_temporary_link(updated_attachment.blob_name, expiry=3600)
         
         logger.info(f"Attachment metadata updated: {attachment_id}")
@@ -277,7 +277,7 @@ async def delete_attachment(
     
     try:
         # Get from database
-        attachment = await db_manager.get_attachment(attachment_id, userid)
+        attachment = await db_manager.get_attachment(attachment_id)
         
         if not attachment:
             raise HTTPException(
@@ -328,7 +328,7 @@ async def get_user_attachments(
         )
     
     try:
-        attachments = await db_manager.get_user_attachments(userid)
+        attachments = db_manager.get_user_attachments(userid)
         
         return {
             "userid": userid,

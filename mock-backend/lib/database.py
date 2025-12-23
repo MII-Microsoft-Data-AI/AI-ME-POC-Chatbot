@@ -41,18 +41,18 @@ class Attachment:
     metadata: Optional[Dict[str, Any]] = None  # JSON metadata
 
 class DatabaseManager:
-    """Async database manager for conversation and file metadata using Cosmos DB."""
+    """database manager for conversation and file metadata using Cosmos DB."""
     
     def __init__(self):
         pass
 
-    async def rename_conversation(self, conversation_id: str, userid: str, new_title: str) -> bool:
+    def rename_conversation(self, conversation_id: str, userid: str, new_title: str) -> bool:
         """Rename a conversation."""
         container = db_connection.get_conversations_container()
         
         try:
             # Read the item first
-            item = await container.read_item(
+            item = container.read_item(
                 item=conversation_id,
                 partition_key=userid
             )
@@ -61,7 +61,7 @@ class DatabaseManager:
             item['title'] = new_title
 
             # Replace the item
-            await container.replace_item(
+            container.replace_item(
                 item=conversation_id,
                 body=item
             )
@@ -70,7 +70,7 @@ class DatabaseManager:
         except CosmosResourceNotFoundError:
             return False
     
-    async def create_conversation(self, conversation_id: str, title: str, userid: str) -> ConversationMetadata:
+    def create_conversation(self, conversation_id: str, title: str, userid: str) -> ConversationMetadata:
         """Create a new conversation metadata entry."""
         created_at = int(time.time())
         
@@ -84,7 +84,7 @@ class DatabaseManager:
             "title": title 
         }
         
-        await container.create_item(body=document)
+        container.create_item(body=document)
         
         return ConversationMetadata(
             title=title,
@@ -94,12 +94,12 @@ class DatabaseManager:
             created_at=created_at
         )
     
-    async def get_conversation(self, conversation_id: str, userid: str) -> Optional[ConversationMetadata]:
+    def get_conversation(self, conversation_id: str, userid: str) -> Optional[ConversationMetadata]:
         """Get conversation metadata by ID and userid."""
         container = db_connection.get_conversations_container()
         
         try:
-            item = await container.read_item(
+            item = container.read_item(
                 item=conversation_id,
                 partition_key=userid
             )
@@ -114,7 +114,7 @@ class DatabaseManager:
         except CosmosResourceNotFoundError:
             return None
     
-    async def get_user_conversations(self, userid: str) -> List[ConversationMetadata]:
+    def get_user_conversations(self, userid: str) -> List[ConversationMetadata]:
         """Get all conversations for a user, ordered by created_at descending."""
         container = db_connection.get_conversations_container()
         
@@ -128,7 +128,7 @@ class DatabaseManager:
         )
         
         conversations = []
-        async for item in items:
+        for item in items:
             conversations.append(ConversationMetadata(
                 id=item['id'],
                 userid=item['userid'],
@@ -139,7 +139,7 @@ class DatabaseManager:
         
         return conversations
     
-    async def get_last_conversation_id(self, userid: str) -> Optional[str]:
+    def get_last_conversation_id(self, userid: str) -> Optional[str]:
         """Get the last conversation ID for a user."""
         container = db_connection.get_conversations_container()
         
@@ -152,18 +152,18 @@ class DatabaseManager:
             partition_key=userid
         )
         
-        async for item in items:
+        for item in items:
             return item['id']
         
         return None
     
-    async def pin_conversation(self, conversation_id: str, userid: str, is_pinned: bool = True) -> bool:
+    def pin_conversation(self, conversation_id: str, userid: str, is_pinned: bool = True) -> bool:
         """Pin or unpin a conversation."""
         container = db_connection.get_conversations_container()
         
         try:
             # Read the item first
-            item = await container.read_item(
+            item = container.read_item(
                 item=conversation_id,
                 partition_key=userid
             )
@@ -172,7 +172,7 @@ class DatabaseManager:
             item['is_pinned'] = is_pinned
             
             # Replace the item
-            await container.replace_item(
+            container.replace_item(
                 item=conversation_id,
                 body=item
             )
@@ -181,12 +181,12 @@ class DatabaseManager:
         except CosmosResourceNotFoundError:
             return False
     
-    async def delete_conversation(self, conversation_id: str, userid: str) -> bool:
+    def delete_conversation(self, conversation_id: str, userid: str) -> bool:
         """Delete a conversation."""
         container = db_connection.get_conversations_container()
         
         try:
-            await container.delete_item(
+            container.delete_item(
                 item=conversation_id,
                 partition_key=userid
             )
@@ -194,12 +194,12 @@ class DatabaseManager:
         except CosmosResourceNotFoundError:
             return False
     
-    async def conversation_exists(self, conversation_id: str, userid: str) -> bool:
+    def conversation_exists(self, conversation_id: str, userid: str) -> bool:
         """Check if a conversation exists for a user."""
         container = db_connection.get_conversations_container()
         
         try:
-            await container.read_item(
+            container.read_item(
                 item=conversation_id,
                 partition_key=userid
             )
@@ -208,7 +208,7 @@ class DatabaseManager:
             return False
     
     # File operations
-    async def create_file(self, file_id: str, userid: str, filename: str, blob_name: str, workflow_id: Optional[str] = None) -> FileMetadata:
+    def create_file(self, file_id: str, userid: str, filename: str, blob_name: str, workflow_id: Optional[str] = None) -> FileMetadata:
         """Create a new file metadata entry."""
         uploaded_at = int(time.time())
         
@@ -227,7 +227,7 @@ class DatabaseManager:
             "workflow_id": workflow_id
         }
         
-        await container.create_item(body=document)
+        container.create_item(body=document)
         
         return FileMetadata(
             file_id=file_id,
@@ -239,12 +239,12 @@ class DatabaseManager:
             workflow_id=workflow_id
         )
     
-    async def get_file(self, file_id: str, userid: str) -> Optional[FileMetadata]:
+    def get_file(self, file_id: str, userid: str) -> Optional[FileMetadata]:
         """Get file metadata by ID."""
         container = db_connection.get_files_container()
         
         try:
-            item = await container.read_item(
+            item = container.read_item(
                 item=file_id,
                 partition_key=userid
             )
@@ -263,7 +263,7 @@ class DatabaseManager:
         except CosmosResourceNotFoundError:
             return None
     
-    async def get_user_files(self, userid: str) -> List[FileMetadata]:
+    def get_user_files(self, userid: str) -> List[FileMetadata]:
         """Get all files for a user, ordered by uploaded_at descending."""
         container = db_connection.get_files_container()
         
@@ -277,7 +277,7 @@ class DatabaseManager:
         )
         
         files = []
-        async for item in items:
+        for item in items:
             files.append(FileMetadata(
                 file_id=item['file_id'],
                 userid=item['userid'],
@@ -292,13 +292,13 @@ class DatabaseManager:
         
         return files
     
-    async def update_file_status(self, file_id: str, userid: str, status: str, error_message: Optional[str] = None) -> bool:
+    def update_file_status(self, file_id: str, userid: str, status: str, error_message: Optional[str] = None) -> bool:
         """Update file indexing status."""
         container = db_connection.get_files_container()
         
         try:
             # Read the item first
-            item = await container.read_item(
+            item = container.read_item(
                 item=file_id,
                 partition_key=userid
             )
@@ -310,7 +310,7 @@ class DatabaseManager:
                 item['indexed_at'] = int(time.time())
             
             # Replace the item
-            await container.replace_item(
+            container.replace_item(
                 item=file_id,
                 body=item
             )
@@ -319,13 +319,13 @@ class DatabaseManager:
         except CosmosResourceNotFoundError:
             return False
     
-    async def update_file_workflow_id(self, file_id: str, userid: str, workflow_id: str) -> bool:
+    def update_file_workflow_id(self, file_id: str, userid: str, workflow_id: str) -> bool:
         """Update file workflow ID."""
         container = db_connection.get_files_container()
         
         try:
             # Read the item first
-            item = await container.read_item(
+            item = container.read_item(
                 item=file_id,
                 partition_key=userid
             )
@@ -334,7 +334,7 @@ class DatabaseManager:
             item['workflow_id'] = workflow_id
             
             # Replace the item
-            await container.replace_item(
+            container.replace_item(
                 item=file_id,
                 body=item
             )
@@ -343,12 +343,12 @@ class DatabaseManager:
         except CosmosResourceNotFoundError:
             return False
     
-    async def delete_file(self, file_id: str, userid: str) -> bool:
+    def delete_file(self, file_id: str, userid: str) -> bool:
         """Delete a file metadata entry."""
         container = db_connection.get_files_container()
         
         try:
-            await container.delete_item(
+            container.delete_item(
                 item=file_id,
                 partition_key=userid
             )
@@ -356,12 +356,12 @@ class DatabaseManager:
         except CosmosResourceNotFoundError:
             return False
     
-    async def file_exists(self, file_id: str, userid: str) -> bool:
+    def file_exists(self, file_id: str, userid: str) -> bool:
         """Check if a file exists."""
         container = db_connection.get_files_container()
         
         try:
-            await container.read_item(
+            container.read_item(
                 item=file_id,
                 partition_key=userid
             )
@@ -370,7 +370,7 @@ class DatabaseManager:
             return False
     
     # Attachment operations
-    async def create_attachment(self, attachment_id: str, userid: str, filename: str, blob_name: str, attachment_type: str, metadata: Optional[Dict[str, Any]] = None) -> Attachment:
+    def create_attachment(self, attachment_id: str, userid: str, filename: str, blob_name: str, attachment_type: str, metadata: Optional[Dict[str, Any]] = None) -> Attachment:
         """Create a new attachment."""
         created_at = int(time.time())
         
@@ -386,7 +386,7 @@ class DatabaseManager:
             "metadata": metadata
         }
         
-        await container.create_item(body=document)
+        container.create_item(body=document)
         
         return Attachment(
             id=attachment_id,
@@ -398,29 +398,36 @@ class DatabaseManager:
             metadata=metadata
         )
     
-    async def get_attachment(self, attachment_id: str, userid: str) -> Optional[Attachment]:
+    def get_attachment(self, attachment_id: str) -> Optional[Attachment]:
         """Get attachment by ID."""
         container = db_connection.get_attachments_container()
         
         try:
-            item = await container.read_item(
-                item=attachment_id,
-                partition_key=userid
-            )
+            query = "SELECT * FROM c WHERE c.id = @id"
+            parameters = [{"name": "@id", "value": attachment_id}]
             
-            return Attachment(
-                id=item['id'],
-                userid=item['userid'],
-                filename=item['filename'],
-                blob_name=item['blob_name'],
-                type=item['type'],
-                created_at=item['created_at'],
-                metadata=item.get('metadata')
-            )
+            items = list(container.query_items(
+                query=query,
+                parameters=parameters,
+                enable_cross_partition_query=True
+            ))
+            
+            for item in items:
+                return Attachment(
+                    id=item['id'],
+                    userid=item['userid'],
+                    filename=item['filename'],
+                    blob_name=item['blob_name'],
+                    type=item['type'],
+                    created_at=item['created_at'],
+                    metadata=item.get('metadata')
+                )
+            
+            return None
         except CosmosResourceNotFoundError:
             return None
     
-    async def get_user_attachments(self, userid: str) -> List[Attachment]:
+    def get_user_attachments(self, userid: str) -> List[Attachment]:
         """Get all attachments for a user, ordered by created_at descending."""
         container = db_connection.get_attachments_container()
         
@@ -434,7 +441,7 @@ class DatabaseManager:
         )
         
         attachments = []
-        async for item in items:
+        for item in items:
             attachments.append(Attachment(
                 id=item['id'],
                 userid=item['userid'],
@@ -447,13 +454,13 @@ class DatabaseManager:
         
         return attachments
     
-    async def update_attachment_metadata(self, attachment_id: str, userid: str, metadata: Optional[Dict[str, Any]]) -> bool:
+    def update_attachment_metadata(self, attachment_id: str, userid: str, metadata: Optional[Dict[str, Any]]) -> bool:
         """Update attachment metadata."""
         container = db_connection.get_attachments_container()
         
         try:
             # Read the item first
-            item = await container.read_item(
+            item = container.read_item(
                 item=attachment_id,
                 partition_key=userid
             )
@@ -462,7 +469,7 @@ class DatabaseManager:
             item['metadata'] = metadata
             
             # Replace the item
-            await container.replace_item(
+            container.replace_item(
                 item=attachment_id,
                 body=item
             )
@@ -471,13 +478,13 @@ class DatabaseManager:
         except CosmosResourceNotFoundError:
             return False
     
-    async def update_attachment_type(self, attachment_id: str, userid: str, attachment_type: str) -> bool:
+    def update_attachment_type(self, attachment_id: str, userid: str, attachment_type: str) -> bool:
         """Update attachment type."""
         container = db_connection.get_attachments_container()
         
         try:
             # Read the item first
-            item = await container.read_item(
+            item = container.read_item(
                 item=attachment_id,
                 partition_key=userid
             )
@@ -486,7 +493,7 @@ class DatabaseManager:
             item['type'] = attachment_type
             
             # Replace the item
-            await container.replace_item(
+            container.replace_item(
                 item=attachment_id,
                 body=item
             )
@@ -495,12 +502,12 @@ class DatabaseManager:
         except CosmosResourceNotFoundError:
             return False
     
-    async def delete_attachment(self, attachment_id: str, userid: str) -> bool:
+    def delete_attachment(self, attachment_id: str, userid: str) -> bool:
         """Delete an attachment."""
         container = db_connection.get_attachments_container()
         
         try:
-            await container.delete_item(
+            container.delete_item(
                 item=attachment_id,
                 partition_key=userid
             )
@@ -508,12 +515,12 @@ class DatabaseManager:
         except CosmosResourceNotFoundError:
             return False
     
-    async def attachment_exists(self, attachment_id: str, userid: str) -> bool:
+    def attachment_exists(self, attachment_id: str, userid: str) -> bool:
         """Check if an attachment exists."""
         container = db_connection.get_attachments_container()
         
         try:
-            await container.read_item(
+            container.read_item(
                 item=attachment_id,
                 partition_key=userid
             )

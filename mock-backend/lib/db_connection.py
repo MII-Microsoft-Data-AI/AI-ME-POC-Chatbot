@@ -2,6 +2,7 @@
 import os
 from typing import Optional
 from azure.cosmos.aio import CosmosClient
+from azure.cosmos import CosmosClient as SyncCosmosClient
 from azure.cosmos import PartitionKey
 
 class CosmosDBConnection:
@@ -30,25 +31,25 @@ class CosmosDBConnection:
             if not self.endpoint or not self.key:
                 raise ValueError("COSMOS_ENDPOINT and COSMOS_KEY must be set in environment variables")
             
-            self._client = CosmosClient(self.endpoint, self.key)
+            self._client = SyncCosmosClient(self.endpoint, self.key)
             
             # Create database if not exists
-            self._database = await self._client.create_database_if_not_exists(id=self.database_name)
+            self._database = self._client.create_database_if_not_exists(id=self.database_name)
             
             # Create conversations container with userid as partition key
-            self._conversations_container = await self._database.create_container_if_not_exists(
+            self._conversations_container = self._database.create_container_if_not_exists(
                 id=self.conversations_container,
                 partition_key=PartitionKey(path="/userid")
             )
             
             # Create files container with userid as partition key
-            self._files_container = await self._database.create_container_if_not_exists(
+            self._files_container = self._database.create_container_if_not_exists(
                 id=self.files_container,
                 partition_key=PartitionKey(path="/userid")
             )
 
             # Create attachments container with userid as partition key
-            await self._database.create_container_if_not_exists(
+            self._database.create_container_if_not_exists(
                 id=self.attachments_container,
                 partition_key=PartitionKey(path="/userid")
             )
@@ -60,7 +61,7 @@ class CosmosDBConnection:
     async def close_cosmos_client(self):
         """Close Cosmos DB client."""
         if self._client:
-            await self._client.close()
+            self._client.close()
             self._client = None
             self._database = None
             self._conversations_container = None

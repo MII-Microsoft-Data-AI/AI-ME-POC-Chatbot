@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize HTTP Basic Auth
-security = HTTPBasic()
+security = HTTPBasic(auto_error=False)
 
 # Get credentials from environment
 BACKEND_AUTH_USERNAME = os.getenv("BACKEND_AUTH_USERNAME", "apiuser")
@@ -30,6 +30,9 @@ def verify_credentials(credentials: Annotated[HTTPBasicCredentials, Depends(secu
     Raises:
         HTTPException: If authentication fails
     """
+    print("🔐 Verifying credentials for user:", credentials.username)
+    print("   Provided password length:", len(credentials.password) * "*")
+
     # Use secrets.compare_digest to prevent timing attacks
     is_correct_username = secrets.compare_digest(
         credentials.username.encode("utf-8"), 
@@ -41,6 +44,7 @@ def verify_credentials(credentials: Annotated[HTTPBasicCredentials, Depends(secu
     )
     
     if not (is_correct_username and is_correct_password):
+        print("❌ Authentication failed for user:", credentials.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",

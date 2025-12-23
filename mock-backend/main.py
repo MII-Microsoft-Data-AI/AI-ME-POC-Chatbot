@@ -8,6 +8,10 @@ sys.dont_write_bytecode = True
 from dotenv import load_dotenv
 load_dotenv()
 
+# Disable Azure Cosmos DB HTTP logging
+import logging
+logging.getLogger("azure.cosmos._cosmos_http_logging_policy").setLevel(logging.WARNING)
+
 from typing import Annotated
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends
@@ -42,13 +46,14 @@ async def add_timing_header(request: Request, call_next):
     """Add timing information to debug slow requests."""
     start_time = time.time()
     print(f"⏱️  [{request.method}] {request.url.path} - START")
-    
-    response = await call_next(request)
-    
+    try:
+        response = await call_next(request)
+    except Exception as e:
+        print(f"❌ Error processing request: {e}")
+        raise e
     process_time = time.time() - start_time
     response.headers["X-Process-Time"] = str(process_time)
     print(f"⏱️  [{request.method}] {request.url.path} - DONE in {process_time:.3f}s")
-    
     return response
 
 @app.on_event("startup")
@@ -90,7 +95,7 @@ async def health():
 # Add external routers
 from routes.chat_conversation import chat_conversation_route
 from routes.file_indexing import file_indexing_route
-from routes.image_generation import image_generation_route
+# from routes.image_generation import image_generation_route
 from routes.attachment import attachment_routes
 
 app.include_router(
@@ -103,11 +108,11 @@ app.include_router(
     tags=["file-indexing"]
 )
 
-app.include_router(
-    image_generation_route,
-    prefix="/api/v1",
-    tags=["image-generation"]
-)
+# app.include_router(
+#     image_generation_route,
+#     prefix="/api/v1",
+#     tags=["image-generation"]
+# )
 
 app.include_router(
     attachment_routes,

@@ -30,6 +30,33 @@ export function useConversationCreator(mode: ChatMode) {
         // Get the message from composer
         const composerState = threadRuntime.composer.getState()
         const message = composerState.text
+        const attachmentInternalUrl: string[] = [] 
+        
+        // Upload attachments in parallel
+        const uploadPromises = composerState.attachments
+          .filter(att => att.file)
+          .map(async (att) => {
+            const formData = new FormData()
+            formData.append('file', att.file!)
+            formData.append('type', 'image')
+            
+            const response = await fetch('/api/be/api/v1/attachments/', {
+              method: 'POST',
+              body: formData,
+            })
+            
+            if (!response.ok) {
+              throw new Error(`Failed to upload attachment: ${response.statusText}`)
+            }
+            
+            const data = await response.json()
+            return data.url
+          })
+        
+        if (uploadPromises.length > 0) {
+          const uploadedUrls = await Promise.all(uploadPromises)
+          attachmentInternalUrl.push(...uploadedUrls)
+        }
 
         if (!message.trim()) return
 
@@ -42,7 +69,7 @@ export function useConversationCreator(mode: ChatMode) {
 
         // Create conversation with timeout
         const createdId = await withTimeout(
-          CreateConversation(conversationId, message),
+          CreateConversation(conversationId, message, attachmentInternalUrl),
           CONVERSATION_CONSTANTS.CREATION_TIMEOUT_MS,
           'Conversation creation timeout (30s)'
         )

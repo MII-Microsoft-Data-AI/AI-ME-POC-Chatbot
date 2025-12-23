@@ -15,6 +15,7 @@ from langchain_core.messages.utils import (
 from .tools import AVAILABLE_TOOLS
 from .model import model
 from .prompt import FALLBACK_SYSTEM_PROMPT, get_prompty_client
+from .utils import sanitize_and_validate_messages, change_file_to_url
 
 class AgentState(TypedDict):
     """State for the agent graph."""
@@ -68,13 +69,21 @@ def call_model(state: AgentState, config = None) -> Dict[str, List[BaseMessage]]
         end_on=("human", "tool"),
     )
 
+    # Sanitize and validate messages to ensure proper tool call/response pairing
+    messages = sanitize_and_validate_messages(messages)
+    
+    # Convert chatbot://{id} URLs to temporary blob URLs with SAS tokens
+    messages = change_file_to_url(messages)
+
+    print(messages)
+
     prompty = get_prompty_client()
     prompt = prompty.get_prompt('Main Chat Agent')
     if (prompt is None):
         prompt = FALLBACK_SYSTEM_PROMPT
 
     system_msg = SystemMessage(content=prompt.strip())
-    messages = [system_msg] + state["messages"]
+    messages = [system_msg] + messages
         
     # Bind tools to the model
     model_with_tools = model.bind_tools(AVAILABLE_TOOLS)
