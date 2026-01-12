@@ -17,11 +17,14 @@ from openai import AzureOpenAI
 from agent.graph import get_graph
 from lib.database import db_manager
 
+
 class ChatRequest(BaseModel):
     messages: list
     mode: str = "chat"  # "chat" or "image"
 
+
 chat_conversation_route = APIRouter()
+
 
 # Initialize Azure OpenAI client for DALL-E
 def get_dalle_client():
@@ -31,20 +34,21 @@ def get_dalle_client():
         api_key=os.getenv("AZURE_OPENAI_API_KEY"),
     )
 
+
 async def generate_image_stream(prompt: str, conversation_id: str):
     """Generate image using DALL-E and return as stream format compatible with assistant-ui"""
     import uuid
     from langchain_core.messages import HumanMessage, AIMessage
-    
+
     message_id = str(uuid.uuid4())
-    
+
     try:
         # Send start message with conversation ID
         yield f"f:{json.dumps({'messageId': message_id, 'conversationId': conversation_id})}\n"
-        
+
         client = get_dalle_client()
         deployment_name = os.getenv("AZURE_OPENAI_DALLE_DEPLOYMENT_NAME", "dall-e-3")
-        
+
         # Generate image
         result = client.images.generate(
             model=deployment_name,
@@ -54,13 +58,15 @@ async def generate_image_stream(prompt: str, conversation_id: str):
             style="vivid",
             n=1,
         )
-        
+
         image_url = result.data[0].url
         revised_prompt = result.data[0].revised_prompt or prompt
-        
+
         # Format response as markdown
-        response_text = f"![Generated Image]({image_url})\n\n*Revised prompt: {revised_prompt}*"
-        
+        response_text = (
+            f"![Generated Image]({image_url})\n\n*Revised prompt: {revised_prompt}*"
+        )
+
         # Save to LangGraph state FIRST before streaming
         try:
             graph = get_graph()
@@ -69,79 +75,95 @@ async def generate_image_stream(prompt: str, conversation_id: str):
                 values={
                     "messages": [
                         HumanMessage(content=prompt),
-                        AIMessage(content=response_text)
+                        AIMessage(content=response_text),
                     ]
-                }
+                },
             )
             print(f"✅ Saved image generation to LangGraph state: {conversation_id}")
         except Exception as e:
             print(f"❌ Failed to save to LangGraph state: {str(e)}")
-        
+
         # Send text delta (0:) - content must be JSON string
         yield f"0:{json.dumps(response_text)}\n"
-        
+
         # Send finish message (d:)
         yield f"d:{json.dumps({'finishReason': 'stop', 'usage': {'promptTokens': 0, 'completionTokens': 0}})}\n"
-        
+
     except Exception as e:
         error_message = f"Failed to generate image: {str(e)}"
         yield f"3:{json.dumps(error_message)}\n"
+
 
 class CreateConversationRequest(BaseModel):
     conversationId: str | None = None
     initialChat: str | None = None
 
+
 @chat_conversation_route.post("/create-conversation")
-async def create_new_conversation(request: CreateConversationRequest | None = None, _ = Depends(get_authenticated_user), userid: Annotated[str | None, Header()] = None):
+async def create_new_conversation(
+    request: CreateConversationRequest | None = None,
+    _=Depends(get_authenticated_user),
+    userid: Annotated[str | None, Header()] = None,
+):
     """Create a new conversation and return its ID."""
     import time
+
     start = time.time()
     graph = get_graph()
-    
+
     if not userid:
         return {"error": "Missing userid header"}
-    
+
     if not request.initialChat:
         return {"error": "Missing initialChat in request body"}
-    
-    print(f"  🔹 Auth check: {(time.time() - start)*1000:.0f}ms")
-    
+
+    print(f"  🔹 Auth check: {(time.time() - start) * 1000:.0f}ms")
+
     # Use provided ID or generate a new one
     t1 = time.time()
-    conversation_id = request.conversationId if request and request.conversationId else generate_uuid()
-    print(f"  🔹 UUID gen: {(time.time() - t1)*1000:.0f}ms")
-    
+    conversation_id = (
+        request.conversationId
+        if request and request.conversationId
+        else generate_uuid()
+    )
+    print(f"  🔹 UUID gen: {(time.time() - t1) * 1000:.0f}ms")
+
     t2 = time.time()
     db_manager.create_conversation(conversation_id, request.initialChat, userid)
-    print(f"  🔹 DB create: {(time.time() - t2)*1000:.0f}ms")
-    
-    print(f"  ✅ Total: {(time.time() - start)*1000:.0f}ms")
-    
+    print(f"  🔹 DB create: {(time.time() - t2) * 1000:.0f}ms")
+
+    print(f"  ✅ Total: {(time.time() - start) * 1000:.0f}ms")
+
     return {
         "conversationId": conversation_id,
         "initialChat": request.initialChat,
-        "userId": userid
+        "userId": userid,
     }
+
 
 # Legacy /chat endpoint removed - all chats now use /conversations/{conversationId}/chat
 
 
 @chat_conversation_route.get("/last-conversation-id")
-async def get_last_conversation_id(_: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None):
+async def get_last_conversation_id(
+    _: Annotated[str, Depends(get_authenticated_user)],
+    userid: Annotated[str | None, Header()] = None,
+):
     """Get last conversation ID endpoint."""
     if not userid:
         return {"error": "Missing userid header"}
-    
+
     # Fetch the last conversation ID for the user from the database
     last_conversation_id = db_manager.get_last_conversation_id(userid)
 
-    return {
-        "userId": userid,
-        "lastConversationId": last_conversation_id
-    }
+    return {"userId": userid, "lastConversationId": last_conversation_id}
+
 
 @chat_conversation_route.get("/conversations")
-async def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None):
+async def get_conversations(
+    _: Annotated[str, Depends(get_authenticated_user)],
+    userid: Annotated[str | None, Header()] = None,
+):
     """Get conversations endpoint."""
     if not userid:
         return {"error": "Missing userid header"}
@@ -150,7 +172,7 @@ async def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], 
     conversations = db_manager.get_user_conversations(userid)
 
     graph = get_graph()
-    
+
     # Convert to the expected API response format
     response = []
     for conv in conversations:
@@ -163,8 +185,12 @@ async def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], 
         # Get title from first message in LangGraph state if still default
         if title == "New Conversation":
             # Get the first message from the conversation to use as title
-            conv_graph_val = (graph.get_state(config={"configurable": {"thread_id": conv.id}})).values
-            conv_graph_messages = conv_graph_val.get("messages", []) if conv_graph_val else []
+            conv_graph_val = (
+                graph.get_state(config={"configurable": {"thread_id": conv.id}})
+            ).values
+            conv_graph_messages = (
+                conv_graph_val.get("messages", []) if conv_graph_val else []
+            )
             title = "New Conversation"  # Default title
 
             if conv_graph_messages:
@@ -175,88 +201,107 @@ async def get_conversations(_: Annotated[str, Depends(get_authenticated_user)], 
                 if isinstance(content, list) and len(content) > 0:
                     # Handle list format (e.g., [{"type": "text", "text": "..."}])
                     for item in content:
-                        if isinstance(item, dict) and item.get('type') == 'text':
-                            title = item.get('text', '').strip()
+                        if isinstance(item, dict) and item.get("type") == "text":
+                            title = item.get("text", "").strip()
                             break
                 elif isinstance(content, str):
                     # Handle simple string format
                     title = content.strip()
-                
+
                 # Truncate long titles and add ellipsis
                 if len(title) > 50:
                     title = title[:50] + "..."
 
-        response.append({
-            "id": conv.id,
-            "title": title,
-            "created_at": conv.created_at,
-            "is_pinned": conv.is_pinned
-        })
-    
+        response.append(
+            {
+                "id": conv.id,
+                "title": title,
+                "created_at": conv.created_at,
+                "is_pinned": conv.is_pinned,
+            }
+        )
+
     return response
 
+
 @chat_conversation_route.get("/conversations/{conversation_id}")
-async def get_chat_history(_: Annotated[str, Depends(get_authenticated_user)], userid:  Annotated[str | None, Header()] = None, conversation_id: str = ""):
-    """Get chat history for a conversation."""
+async def get_chat_history(
+    _: Annotated[str, Depends(get_authenticated_user)],
+    userid: Annotated[str | None, Header()] = None,
+    conversation_id: str = "",
+):
+    """Get chat history for a conversation. Returns empty for new conversations."""
     if not userid:
         return {"error": "Missing userid header"}
-    
-    # Check if the conversation exists and belongs to the user
+
+    # ✅ PHASE 1.1: Don't return 404 for new conversations
+    # If conversation doesn't exist yet, it's likely a new one being created
+    # The frontend will skip this call anyway if pending message exists
     if not db_manager.conversation_exists(conversation_id, userid):
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    
+        print(
+            f"[Phase1.1] Conversation {conversation_id} not found for user, returning empty history"
+        )
+        return []
+
     # Fetch chat history for the conversation from LangGraph state
     try:
         graph = get_graph()
         # Get the conversation state from the checkpointer
-        states_generator = graph.get_state(config={"configurable": {"thread_id": conversation_id}})
+        states_generator = graph.get_state(
+            config={"configurable": {"thread_id": conversation_id}}
+        )
         states = [x for x in states_generator]
 
         json_dumps = dumps(states)
-        
+
         return json.loads(json_dumps)
-        
+
     except Exception as e:
         print(e)
-        raise HTTPException(status_code=500, detail=f"Failed to fetch chat history: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch chat history: {str(e)}"
+        )
+
 
 @chat_conversation_route.post("/conversations/{conversation_id}/chat")
-async def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None, conversation_id: str = "", request: ChatRequest = None):
-    """Chat in a specific conversation."""
+async def chat_conversation(
+    _: Annotated[str, Depends(get_authenticated_user)],
+    userid: Annotated[str | None, Header()] = None,
+    conversation_id: str = "",
+    request: ChatRequest = None,
+):
+    """Chat in a specific conversation. Auto-creates if doesn't exist (Phase 2.1)."""
 
     if not userid:
         return {"error": "Missing userid header"}
-    
+
     if not request:
         return {"error": "Missing request body"}
-
 
     # Check if the conversation exists and belongs to the user
     if not db_manager.conversation_exists(conversation_id, userid):
         raise HTTPException(status_code=404, detail="Conversation not found")
-    
-    # Convert the input message 
     if type(request.messages) is not list or len(request.messages) == 0:
         return {"error": "Invalid messages format"}
-    
+
     last_message = request.messages[-1] if request.messages else ""
-    
+
     # Route based on mode (same as /chat endpoint)
     if request.mode == "image":
         # Extract text from message content
-        message_content = last_message.get('content', '')
+        message_content = last_message.get("content", "")
         if isinstance(message_content, list):
             prompt = ""
             for item in message_content:
-                if isinstance(item, dict) and item.get('type') == 'text':
-                    prompt = item.get('text', '')
+                if isinstance(item, dict) and item.get("type") == "text":
+                    prompt = item.get("text", "")
                     break
         else:
             prompt = str(message_content)
-        
+
         if not prompt:
             return {"error": "No prompt provided for image generation"}
-        
+
         # Generate image using DALL-E
         return StreamingResponse(
             generate_image_stream(prompt, conversation_id),
@@ -266,16 +311,15 @@ async def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], 
                 "Content-Type": "text/plain; charset=utf-8",
                 "Connection": "keep-alive",
                 "x-vercel-ai-data-stream": "v1",
-                "x-vercel-ai-ui-message-stream": "v1"
-            }
+                "x-vercel-ai-ui-message-stream": "v1",
+            },
         )
     else:
         # Normal chat mode - use LangGraph
-        last_message_langgraph_content = from_assistant_ui_contents_to_langgraph_contents(last_message['content'])
-        input_message = [{
-            "role": "user",
-            "content": last_message_langgraph_content
-        }]
+        last_message_langgraph_content = (
+            from_assistant_ui_contents_to_langgraph_contents(last_message["content"])
+        )
+        input_message = [{"role": "user", "content": last_message_langgraph_content}]
 
         graph = get_graph()
 
@@ -287,11 +331,17 @@ async def chat_conversation(_: Annotated[str, Depends(get_authenticated_user)], 
                 "Content-Type": "text/plain; charset=utf-8",
                 "Connection": "keep-alive",
                 "x-vercel-ai-data-stream": "v1",
-                "x-vercel-ai-ui-message-stream": "v1"
-            }
+                "x-vercel-ai-ui-message-stream": "v1",
+            },
         )
+
+
 @chat_conversation_route.delete("/conversations/{conversation_id}")
-async def delete_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None, conversation_id: str = ""):
+async def delete_conversation(
+    _: Annotated[str, Depends(get_authenticated_user)],
+    userid: Annotated[str | None, Header()] = None,
+    conversation_id: str = "",
+):
     """Delete a conversation."""
 
     if not userid:
@@ -299,42 +349,56 @@ async def delete_conversation(_: Annotated[str, Depends(get_authenticated_user)]
 
     # Delete the conversation from the database
     deleted = db_manager.delete_conversation(conversation_id, userid)
-    
+
     if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    
+
     return {"message": "Conversation deleted successfully"}
 
+
 @chat_conversation_route.post("/conversations/{conversation_id}/pin")
-async def pin_conversation(_: Annotated[str, Depends(get_authenticated_user)], userid: Annotated[str | None, Header()] = None, conversation_id: str = ""):
+async def pin_conversation(
+    _: Annotated[str, Depends(get_authenticated_user)],
+    userid: Annotated[str | None, Header()] = None,
+    conversation_id: str = "",
+):
     """Pin or unpin a conversation."""
 
     if not userid:
         return {"error": "Missing userid header"}
-    
+
     existing_data = db_manager.get_conversation(conversation_id, userid)
     if not existing_data:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Pin or unpin the conversation in the database
-    updated = db_manager.pin_conversation(conversation_id, userid, not existing_data.is_pinned)
-    
+    updated = db_manager.pin_conversation(
+        conversation_id, userid, not existing_data.is_pinned
+    )
+
     if not updated:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    
+
     action = "pinned" if updated else "unpinned"
     return {"message": f"Conversation {action} successfully"}
+
 
 class RenameConversationRequest(BaseModel):
     new_title: str | None = None
 
+
 @chat_conversation_route.post("/conversations/{conversation_id}/rename")
-async def rename_conversation(_: Annotated[str, Depends(get_authenticated_user)],request: RenameConversationRequest, userid: Annotated[str | None, Header()] = None, conversation_id: str = ""):
+async def rename_conversation(
+    _: Annotated[str, Depends(get_authenticated_user)],
+    request: RenameConversationRequest,
+    userid: Annotated[str | None, Header()] = None,
+    conversation_id: str = "",
+):
     """Rename a conversation."""
 
     if not userid:
         return {"error": "Missing userid header"}
-    
+
     new_title = request.new_title
     if not new_title:
         return {"error": "Missing new_title in request body"}
@@ -345,8 +409,8 @@ async def rename_conversation(_: Annotated[str, Depends(get_authenticated_user)]
 
     # Rename the conversation in the database
     updated = db_manager.rename_conversation(conversation_id, userid, new_title)
-    
+
     if not updated:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    
+
     return {"message": "Conversation renamed successfully"}

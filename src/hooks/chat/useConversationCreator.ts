@@ -2,30 +2,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useThreadRuntime } from '@assistant-ui/react'
 import type { ChatMode } from '@/types/chat'
-import { CreateConversation } from '@/lib/integration/client/chat-conversation'
 import { savePendingMessage } from '@/utils/chat/storage'
-import {
-  generateConversationId,
-  withTimeout,
-  CONVERSATION_CONSTANTS,
-} from '@/utils/chat/conversation'
-
-// Utility function to convert File to base64
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = reader.result as string
-      resolve(result)
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
+import { generateConversationId, withTimeout, CONVERSATION_CONSTANTS } from '@/utils/chat/conversation'
+import { CreateConversation } from '@/lib/integration/client/chat-conversation'
+import { PerformanceLogger } from '@/utils/performance-logger'
 
 // Hook untuk handle conversation creation flow
-// Override composer.send untuk create conversation dulu sebelum redirect
-// Flow: generate ID -> create conversation (30s timeout) -> save message -> redirect
+// ✅ PHASE 1: Optimized redirect pattern with improved storage and timing
 export function useConversationCreator(mode: ChatMode) {
   const router = useRouter()
   const threadRuntime = useThreadRuntime()
@@ -34,16 +17,15 @@ export function useConversationCreator(mode: ChatMode) {
   useEffect(() => {
     if (!threadRuntime) return
 
-    // Store original send function
     const originalSend = threadRuntime.composer.send
 
-    // Override send function to create conversation first
     threadRuntime.composer.send = async () => {
       try {
-        // Get the message from composer
+        const perf = new PerformanceLogger('NewChatFlow')
+
         const composerState = threadRuntime.composer.getState()
         const message = composerState.text
-        const attachmentFile: File[] = [] 
+        const attachmentFile: File[] = []
 
         for (const attachment of composerState.attachments) {
           if (attachment.file) {
@@ -57,6 +39,7 @@ export function useConversationCreator(mode: ChatMode) {
 
         // Generate ID client-side
         const conversationId = generateConversationId()
+        perf.checkpoint('UUID generated')
 
         console.log('Creating conversation:', conversationId)
 
@@ -66,6 +49,7 @@ export function useConversationCreator(mode: ChatMode) {
           CONVERSATION_CONSTANTS.CREATION_TIMEOUT_MS,
           'Conversation creation timeout (30s)'
         )
+        perf.checkpoint('Conversation created via API')
 
         if (!createdId) {
           throw new Error('Failed to create conversation')
@@ -73,23 +57,25 @@ export function useConversationCreator(mode: ChatMode) {
 
         console.log('Conversation created successfully:', createdId)
 
-        // Store message in sessionStorage to send after redirect
-        savePendingMessage(message, mode, attachmentFile)
+        // ✅ Small delay to ensure DB write is committed before redirect
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // ✅ PHASE 1.4: Use smart storage instead of direct IDB
+        await savePendingMessage(message, mode, attachmentFile)
+        perf.checkpoint('Message saved to storage')
 
         // Redirect to conversation page
         router.push(`/chat/${createdId}`)
+        perf.finish('NewChatFlow')
       } catch (error) {
         console.error('Failed to create conversation:', error)
         setIsCreating(false)
         
-        // Show error to user
-        const errorMessage =
-          error instanceof Error ? error.message : 'Failed to create conversation'
+        const errorMessage = error instanceof Error ? error.message : 'Failed to create conversation'
         alert(`${errorMessage}. Please try again.`)
       }
     }
 
-    // Cleanup: restore original send function
     return () => {
       threadRuntime.composer.send = originalSend
     }
