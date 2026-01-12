@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import type { ThreadHistoryAdapter } from '@assistant-ui/react'
 import { LoadConversationHistory } from '@/lib/integration/client/chat-conversation'
+import { STORAGE_KEYS } from '@/utils/chat/storage'
 
 // Hook untuk load conversation history dengan error handling
 // Returns: historyAdapter (memoized), isLoadingHistory, error
@@ -15,6 +16,16 @@ export function useConversationHistory(conversationId: string) {
         try {
           if (!conversationId) {
             return { messages: [] }
+          }
+
+          // ✅ PHASE 1.1: Check if this is a new conversation redirect
+          if (typeof window !== 'undefined') {
+            const hasPendingMessage = sessionStorage.getItem(STORAGE_KEYS.PENDING_MESSAGE)
+            if (hasPendingMessage) {
+              console.log('[Optimization] Skipping history load for new conversation')
+              setIsLoadingHistory(false)
+              return { messages: [] }
+            }
           }
 
           setIsLoadingHistory(true)
