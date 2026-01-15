@@ -1,5 +1,5 @@
 # Multi-stage build: Backend
-FROM python:3.11-slim as backend-builder
+FROM python:3.12-slim as backend-builder
 
 WORKDIR /app/backend
 
@@ -37,7 +37,7 @@ COPY . .
 RUN npm run build
 
 # Final stage: Runtime
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
