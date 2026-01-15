@@ -108,6 +108,7 @@ All required variables must be set in the `.env` file:
 | AZURE_BLOB_STORAGE_CONNECTION_STRING | Yes | - | Blob storage connection |
 | LANGCHAIN_API_KEY | No | - | LangSmith API key (optional) |
 | LANGCHAIN_PROJECT | No | - | LangSmith project name (optional) |
+| USE_OPENAI_CLIENT | No | true | Use OpenAI client instead of Azure OpenAI (set to 'false' to use Azure OpenAI) |
 
 ---
 
