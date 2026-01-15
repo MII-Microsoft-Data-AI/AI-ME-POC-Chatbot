@@ -7,6 +7,18 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'components.json'
+      - 'package.json'
+      - 'bun.lock'
+      - 'next.config.ts'
+      - 'next-env.d.ts'
+      - 'tsconfig.json'
+      - 'postcss.config.mjs'
+      - 'eslint.config.mjs'
+      - '.github/workflows/main_webapp-frontend.yml'
   workflow_dispatch:
 
 jobs:
@@ -21,19 +33,30 @@ jobs:
       - name: Set up Node.js version
         uses: actions/setup-node@v3
         with:
-          node-version: '24.x'
+          node-version: '22.x'
+      
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
 
-      - name: npm install, build, and test
+      - name: bun install
         run: |
-          npm install
-          npm run build --if-present
-          npm run test --if-present
+          bun install
+          bun run build
+
+      - name: Prepare artifact for deployment job
+        run: |
+          mkdir -p ./standalone
+          cp -R ./.next/standalone ./
+          cp -R ./public ./standalone/public
+          cp -R ./.next/static ./standalone/.next
+          rm -rf ./standalone/.env
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
+          include-hidden-files: true
           name: node-app
-          path: .
+          path: ./standalone
 
   deploy:
     runs-on: ubuntu-latest
