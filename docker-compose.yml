@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  ai-me-chatbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-me-chatbot
+    ports:
+      - "8080:8080"  # Frontend
+      - "8081:8081"  # Backend
+    environment:
+      # Backend configuration
+      - PORT=8081
+      - BACKEND_URL=http://localhost:8081
+      
+      # Authentication
+      - NEXTAUTH_URL=http://localhost:8080
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-your-secret-key-here}
+      - BACKEND_API_USERNAME=${BACKEND_API_USERNAME:-your-username}
+      - BACKEND_API_PASSWORD=${BACKEND_API_PASSWORD:-your-secure-password}
+      
+      # Azure Configuration (from .env)
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_DEPLOYMENT=${AZURE_OPENAI_DEPLOYMENT}
+      - AZURE_SEARCH_ENDPOINT=${AZURE_SEARCH_ENDPOINT}
+      - AZURE_SEARCH_KEY=${AZURE_SEARCH_KEY}
+      - AZURE_COSMOS_CONNECTION_STRING=${AZURE_COSMOS_CONNECTION_STRING}
+      - AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=${AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT}
+      - AZURE_DOCUMENT_INTELLIGENCE_KEY=${AZURE_DOCUMENT_INTELLIGENCE_KEY}
+      - AZURE_BLOB_STORAGE_CONNECTION_STRING=${AZURE_BLOB_STORAGE_CONNECTION_STRING}
+      
+      # LangSmith (optional)
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT}
+    
+    volumes:
+      - .env:/app/.env:ro
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
