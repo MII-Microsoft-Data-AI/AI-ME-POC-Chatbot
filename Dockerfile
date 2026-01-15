@@ -53,7 +53,7 @@ RUN npm install -g bun
 
 # Copy Python backend from builder
 COPY --from=backend-builder /app/backend /app/backend
-COPY --from=backend-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=backend-builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=backend-builder /usr/local/bin /usr/local/bin
 
 # Copy Node.js runtime from builder
