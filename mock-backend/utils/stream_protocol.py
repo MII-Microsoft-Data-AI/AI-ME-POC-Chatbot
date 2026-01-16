@@ -11,7 +11,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langchain_core.messages import AIMessageChunk, AIMessage, ToolMessage, HumanMessage
 
 
-DEBUG_STREAM = True
+DEBUG_STREAM = False
 
 # Regex to match <reasoning>...</reasoning> tags (including multiline content)
 REASONING_PATTERN = re.compile(r'<reasoning>(.*?)</reasoning>', re.DOTALL)

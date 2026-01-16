@@ -37,7 +37,7 @@ const ReasoningRoot: FC<
   }>
 > = ({ className, children }) => {
   const collapsibleRef = useRef<HTMLDivElement>(null);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const lockScroll = useScrollLock(collapsibleRef, ANIMATION_DURATION);
 
   const handleOpenChange = useCallback(
