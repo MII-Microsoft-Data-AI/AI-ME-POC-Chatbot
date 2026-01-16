@@ -77,5 +77,5 @@ def create_openai_model(verify_ssl: bool = True, **kwargs) -> ChatOpenAI:
 # To connect to unverified SSL certificates, set VERIFY_SSL=false in environment
 verify_ssl = os.getenv("VERIFY_SSL", "true").lower() == "true"
 model = create_azure_model(verify_ssl=verify_ssl)
-if os.getenv("USE_OPENAI_CLIENT", "true").lower() == "true":
+if os.getenv("USE_OPENAI_CLIENT", "false").lower() == "true":
     model = create_openai_model(verify_ssl=verify_ssl)
