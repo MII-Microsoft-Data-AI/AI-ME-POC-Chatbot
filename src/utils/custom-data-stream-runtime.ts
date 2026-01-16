@@ -150,7 +150,41 @@ class CustomDataStreamRuntimeAdapter implements ChatModelAdapter {
 
       const stream = result.body
         .pipeThrough(new DataStreamDecoder())
-        .pipeThrough(unstable_toolResultStream(context.tools, abortSignal))
+        .pipeThrough(
+          unstable_toolResultStream(
+            getEnabledTools(context.tools ?? {}),
+            abortSignal,
+            async (toolCallId: string, payload: unknown) => {
+              // Execute tool from the context
+              const toolName = Object.keys(context.tools ?? {}).find((name) => {
+                // Match tool call by checking payload or tool name
+                return name === (payload as { name?: string })?.name || name === toolCallId;
+              });
+              
+              if (!toolName) {
+                throw new Error(`Tool not found for call ID: ${toolCallId}`);
+              }
+              
+              const tool = context.tools?.[toolName];
+              if (!tool?.execute) {
+                throw new Error(`Tool ${toolName} does not have an execute method`);
+              }
+              
+              // Create proper ToolExecutionContext
+              const toolContext = {
+                ...context,
+                toolCallId,
+                abortSignal,
+                human: async (payload: unknown) => {
+                  console.warn("Human-in-the-loop not implemented:", payload);
+                  throw new Error("Human approval required but not implemented");
+                },
+              };
+              
+              return await tool.execute(payload as never, toolContext);
+            },
+          ),
+        )
         .pipeThrough(new AssistantMessageAccumulator());
 
       yield* asAsyncIterableStream(stream);
