@@ -2,6 +2,7 @@
 # node_modules/assistant-stream/src/core/serialization/data-stream/chunk-types.ts
 
 import json
+import re
 import uuid
 import typing
 
@@ -10,7 +11,10 @@ from langgraph.graph.state import CompiledStateGraph
 from langchain_core.messages import AIMessageChunk, AIMessage, ToolMessage, HumanMessage
 
 
-DEBUG_STREAM = False
+DEBUG_STREAM = True
+
+# Regex to match <reasoning>...</reasoning> tags (including multiline content)
+REASONING_PATTERN = re.compile(r'<reasoning>(.*?)</reasoning>', re.DOTALL)
 
 
 def handle_tool_message(msg: ToolMessage):
@@ -45,16 +49,36 @@ def handle_tool_message(msg: ToolMessage):
 
 def handle_ai_message(msg: typing.Union[AIMessage, AIMessageChunk], tool_calls_by_idx: dict, tool_calls: dict, accumulated_text: str, token_count: int):
     """
-    Handle AIMessage/AIMessageChunk - processes text content and tool calls
+    Handle AIMessage/AIMessageChunk - processes text content, reasoning, and tool calls
     Returns tuple of (accumulated_text, token_count)
     """
-    # Handle text content - TextDelta (0:)
+    # Handle text content - parse out reasoning tags and send appropriately
     if msg.content:
-        # Send text delta - properly escape the content
         content = str(msg.content)
-        yield f"0:{json.dumps(content)}\n"
-        accumulated_text += content
-        token_count += len(content.split())
+        
+        # Find all reasoning blocks and their positions
+        last_end = 0
+        for match in REASONING_PATTERN.finditer(content):
+            # Send any text before this reasoning block as TextDelta (0:)
+            text_before = content[last_end:match.start()]
+            if text_before:
+                yield f"0:{json.dumps(text_before)}\n"
+                accumulated_text += text_before
+                token_count += len(text_before.split())
+            
+            # Send the reasoning content as ReasoningDelta (g:)
+            reasoning_content = match.group(1)
+            if reasoning_content:
+                yield f"g:{json.dumps(reasoning_content)}\n"
+            
+            last_end = match.end()
+        
+        # Send any remaining text after the last reasoning block as TextDelta (0:)
+        remaining_text = content[last_end:]
+        if remaining_text:
+            yield f"0:{json.dumps(remaining_text)}\n"
+            accumulated_text += remaining_text
+            token_count += len(remaining_text.split())
 
     # Handle tool calls
     if hasattr(msg, 'tool_calls') and msg.tool_calls:

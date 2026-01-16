@@ -48,6 +48,7 @@ import { usePersonalizationContext } from "@/contexts/PersonalizationContext";
 import { getTimeOfDay } from "@/utils/time-utils";
 import { ChatMessageSkeleton } from "@/components/ChatMessageSkeleton";
 import { ModeSelector } from "@/components/ModeSelector";
+import { Reasoning, ReasoningGroup } from "@/components/assistant-ui/reasoning";
 
 const Settings = {
   attachments: true,
@@ -303,6 +304,8 @@ const AssistantMessage: FC = () => {
             components={{
               Text: MarkdownText,
               tools: { Fallback: ToolFallback },
+              Reasoning: Reasoning,
+              ReasoningGroup: ReasoningGroup
             }}
           />
           <MessageError />
