@@ -260,6 +260,136 @@ export interface LanggraphStateHistoryEntry {
 
 export type LanggraphStateHistory = LanggraphStateHistoryEntry[];
 
+// Regex to match <reasoning>...</reasoning> tags (including multiline content)
+const REASONING_PATTERN = /<reasoning>([\s\S]*?)<\/reasoning>/g;
+
+/**
+ * Parse text content and extract reasoning blocks, returning an array of TextMessagePart and ReasoningMessagePart.
+ * Consecutive reasoning blocks are merged into a single ReasoningMessagePart.
+ */
+function parseTextWithReasoning(text: string): (TextMessagePart | ReasoningMessagePart)[] {
+  const parts: (TextMessagePart | ReasoningMessagePart)[] = [];
+  let lastEnd = 0;
+  let match: RegExpExecArray | null;
+  let accumulatedReasoning = "";
+
+  // Reset regex state
+  REASONING_PATTERN.lastIndex = 0;
+
+  while ((match = REASONING_PATTERN.exec(text)) !== null) {
+    // Check if there's text between the last match and this one
+    const textBefore = text.slice(lastEnd, match.index);
+    
+    if (textBefore) {
+      // There's text between reasoning blocks, so flush accumulated reasoning first
+      if (accumulatedReasoning) {
+        parts.push({
+          type: "reasoning" as const,
+          text: accumulatedReasoning,
+        });
+        accumulatedReasoning = "";
+      }
+      // Then add the text
+      parts.push({
+        type: "text" as const,
+        text: textBefore,
+      });
+    }
+
+    // Accumulate the reasoning content
+    const reasoningContent = match[1];
+    if (reasoningContent) {
+      accumulatedReasoning += reasoningContent;
+    }
+
+    lastEnd = match.index + match[0].length;
+  }
+
+  // Flush any remaining accumulated reasoning
+  if (accumulatedReasoning) {
+    parts.push({
+      type: "reasoning" as const,
+      text: accumulatedReasoning,
+    });
+  }
+
+  // Add any remaining text after the last reasoning block
+  const remainingText = text.slice(lastEnd);
+  if (remainingText) {
+    parts.push({
+      type: "text" as const,
+      text: remainingText,
+    });
+  }
+
+  // If no parts were added (no reasoning tags found), return the original text
+  if (parts.length === 0 && text) {
+    parts.push({
+      type: "text" as const,
+      text: text,
+    });
+  }
+
+  return parts;
+}
+
+// Conversion Functions
+/**
+ * Convert AI message content, parsing out <reasoning>...</reasoning> blocks
+ */
+export function convertAIMessageContent(content: MessageContent): ThreadAssistantMessagePart[] {
+  if (typeof content === "string") {
+    return parseTextWithReasoning(content);
+  }
+
+  if (Array.isArray(content)) {
+    const result: ThreadAssistantMessagePart[] = [];
+
+    for (const item of content) {
+      if (typeof item === "string") {
+        result.push(...parseTextWithReasoning(item));
+      } else if (typeof item === "object" && item.type === "text" && typeof item.text === "string") {
+        result.push(...parseTextWithReasoning(item.text));
+      } else if (typeof item === "object" && item.type === "image_url") {
+        if (item.image_url && item.image_url.url) {
+          result.push({
+            type: "image" as const,
+            image: item.image_url.url,
+          });
+        } else {
+          result.push({
+            type: "image" as const,
+            image: String(item.image_url || ""),
+          });
+        }
+      } else if (typeof item === "object" && item.type === "image" && item.source_type === "base64" && item.data && item.mime_type) {
+        result.push({
+          type: "image" as const,
+          image: `data:${item.mime_type};base64,${item.data}`,
+        });
+      } else if (typeof item === "object" && item.type === "image" && item.image) {
+        result.push({
+          type: "image" as const,
+          image: String(item.image),
+        });
+      } else {
+        // Fallback to text
+        result.push({
+          type: "text" as const,
+          text: JSON.stringify(item),
+        });
+      }
+    }
+
+    return result;
+  }
+
+  return [{
+    type: "text" as const,
+    text: String(content),
+  }];
+}
+
 // Conversion Functions
 export function convertLangchainMessageContent(content: MessageContent): ThreadUserMessagePart[] | ThreadAssistantMessagePart[] {
   if (typeof content === "string") {
@@ -540,7 +670,7 @@ export function convertLangchainMessageToThreadMessage(
 
   if (langchainMsg.id[3] === "AIMessage") {
     const aiMsg = langchainMsg as LangchainAIMessage;
-    const textContent = convertLangchainMessageContent(aiMsg.kwargs.content) as ThreadAssistantMessagePart[];
+    const textContent = convertAIMessageContent(aiMsg.kwargs.content);
     const toolCalls = convertLangchainToolCalls(aiMsg.kwargs.tool_calls || [], toolResults);
     
     const content = [...textContent, ...toolCalls];
