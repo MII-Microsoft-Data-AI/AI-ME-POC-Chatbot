@@ -14,6 +14,11 @@ from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, Depends, Header, HTTPException
 from openai import AzureOpenAI
 
+from ag_ui_langgraph import LangGraphAgent
+from ag_ui.core.types import RunAgentInput
+from ag_ui.encoder import EventEncoder
+from fastapi import HTTPException, Request
+
 from agent.graph import get_graph
 from lib.database import db_manager
 
@@ -414,3 +419,53 @@ async def rename_conversation(
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     return {"message": "Conversation renamed successfully"}
+
+
+from ag_ui_langgraph.agent import LangGraphAgent
+
+
+
+@chat_conversation_route.post("/conversations-agui/{conversation_id}/chat")
+async def agui_langgraph_endpoint(
+    _: Annotated[str, Depends(get_authenticated_user)],
+    input_data: RunAgentInput, 
+    request: Request,
+    userid: Annotated[str | None, Header()] = None,
+    conversation_id: str = "",
+):
+    """Chat in a specific conversation with AG-UI LangGraph Agent."""
+    # Get the accept header from the request
+    accept_header = request.headers.get("accept")
+
+    if not userid:
+        return {"error": "Missing userid header"}
+
+    if not request:
+        return {"error": "Missing request body"}
+
+    # Check if the conversation exists and belongs to the user
+    if not db_manager.conversation_exists(conversation_id, userid):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Create an event encoder to properly format SSE events
+    encoder = EventEncoder(accept=accept_header)
+
+    agent = LangGraphAgent(
+        name="sample_agent",
+        graph=get_graph(),
+        description="AG-UI LangGraph Agent for Chat Conversations",
+        config={
+            "configurable": {
+                "thread_id": conversation_id
+            }
+        }
+    )
+
+    async def event_generator():
+        async for event in agent.run(input_data):
+            yield encoder.encode(event)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type=encoder.get_content_type()
+    )

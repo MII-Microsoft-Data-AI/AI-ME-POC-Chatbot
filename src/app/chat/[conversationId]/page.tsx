@@ -9,6 +9,9 @@ import { ConversationContent } from '@/components/features/chat/ConversationCont
 import { ErrorState } from '@/components/features/chat/ErrorState'
 import { ChatLayout } from '@/components/features/chat/ChatLayout'
 import { GenerateImageUI } from '@/components/assistant-ui/tool-ui/ImageGeneration'
+import { useMemo } from 'react'
+import { HttpAgent } from "@ag-ui/client";
+import { useAgUiRuntime } from '@assistant-ui/react-ag-ui'
 
 function ConversationPage() {
   const params = useParams()
@@ -21,7 +24,28 @@ function ConversationPage() {
   const { historyAdapter, isLoadingHistory, error } = useConversationHistory(conversationId)
 
   // Create runtime with conversation ID
-  const runtime = ChatWithConversationIDAPIRuntime(conversationId, historyAdapter, mode)
+  const agentUrl = `/api/be/conversations-agui/${conversationId}/chat`
+
+  const agent = useMemo(() => {
+    return new HttpAgent({
+      threadId: conversationId,
+      url: agentUrl,
+      headers: {
+        Accept: "text/event-stream",
+      },
+    });
+  }, [agentUrl]);
+
+  const runtime = useAgUiRuntime({
+    agent,
+    logger: {
+      debug: (...a: unknown[]) => console.debug("[agui]", ...a),
+      error: (...a: unknown[]) => console.error("[agui]", ...a),
+    },
+    adapters: {
+      history: historyAdapter
+    }
+  });
 
   return (
     <ChatLayout>
