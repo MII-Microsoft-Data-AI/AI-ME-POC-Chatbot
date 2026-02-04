@@ -1,37 +1,46 @@
-'use client'
+"use client";
 
-import { CompositeAttachmentAdapter, SimpleImageAttachmentAdapter, ThreadHistoryAdapter, ThreadMessage } from "@assistant-ui/react";
+import {
+  CompositeAttachmentAdapter,
+  SimpleImageAttachmentAdapter,
+  ThreadHistoryAdapter,
+  ThreadMessage,
+} from "@assistant-ui/react";
 import { formatRelativeTime } from "@/utils/date-utils";
-import { loadFromLanggraphStateHistoryJSON, loadFromLanggraphStateJSON } from "@/utils/langgraph/to-assistant-ui";
+import {
+  loadFromLanggraphStateHistoryJSON,
+  loadFromLanggraphStateJSON,
+} from "@/utils/langgraph/to-assistant-ui";
 import { useCustomDataStreamRuntime } from "@/utils/custom-data-stream-runtime";
 import type { ChatMode } from "@/components/assistant-ui/thread";
 import { VisionImageAdapter } from "@/utils/chat/attachment-adapter";
 
-const BaseAPIPath = "/api/be"
+const BaseAPIPath = "/api/be";
 
 // Attachments Handler
 // For now, we only handle images -kaenova
-const CompositeAttachmentsAdapter = new CompositeAttachmentAdapter([
+export const CompositeAttachmentsAdapter = new CompositeAttachmentAdapter([
   new VisionImageAdapter(),
-])
+]);
 
 // First Chat API Runtime (without conversation ID parameters)
-export const FirstChatAPIRuntime = (mode: ChatMode = 'chat') => useCustomDataStreamRuntime({
-  api: `${BaseAPIPath}/chat`,
-  body: { mode }, // Pass mode to backend
-  adapters: {
-    attachments: CompositeAttachmentsAdapter,
-  }
-})
+export const FirstChatAPIRuntime = (mode: ChatMode = "chat") =>
+  useCustomDataStreamRuntime({
+    api: `${BaseAPIPath}/chat`,
+    body: { mode }, // Pass mode to backend
+    adapters: {
+      attachments: CompositeAttachmentsAdapter,
+    },
+  });
 
 // Get Last Conversation ID from A User
 // The userid is obtained from the session in the backend
 // Being passed on "userid" header to the backend
 export async function GetLastConversationId(): Promise<string | null> {
   const response = await fetch(`${BaseAPIPath}/last-conversation-id`, {
-    method: 'GET',
+    method: "GET",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
   });
 
@@ -39,7 +48,7 @@ export async function GetLastConversationId(): Promise<string | null> {
     const data = await response.json();
     return data.lastConversationId;
   } else {
-    console.error('Failed to fetch last conversation ID');
+    console.error("Failed to fetch last conversation ID");
     return null;
   }
 }
@@ -48,32 +57,42 @@ export async function GetLastConversationId(): Promise<string | null> {
 // You need to provide the conversationId and historyAdapter
 // The conversationId is obtained from the URL parameters
 // The historyAdapter is used to load and append messages to the thread
-export const ChatWithConversationIDAPIRuntime = (conversationId: string, historyAdapter: ThreadHistoryAdapter, mode: ChatMode = 'chat') => useCustomDataStreamRuntime({
-  api: `${BaseAPIPath}/conversations/${conversationId}/chat`,
-  body: { mode }, // Pass mode to backend
-  adapters: {
-    history: historyAdapter,
-    attachments: CompositeAttachmentsAdapter,
-  },
-})
-
-type LoadHistoryResponseType = { message: ThreadMessage, parentId: string | null }[] | null
-
-export const LoadConversationHistory = async (conversationId: string): Promise<LoadHistoryResponseType> => {
-
-  const response = await fetch(`${BaseAPIPath}/conversations/${conversationId}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
+export const ChatWithConversationIDAPIRuntime = (
+  conversationId: string,
+  historyAdapter: ThreadHistoryAdapter,
+  mode: ChatMode = "chat",
+) =>
+  useCustomDataStreamRuntime({
+    api: `${BaseAPIPath}/conversations/${conversationId}/chat`,
+    body: { mode }, // Pass mode to backend
+    adapters: {
+      history: historyAdapter,
+      attachments: CompositeAttachmentsAdapter,
     },
   });
 
-  try {
+type LoadHistoryResponseType =
+  | { message: ThreadMessage; parentId: string | null }[]
+  | null;
 
+export const LoadConversationHistory = async (
+  conversationId: string,
+): Promise<LoadHistoryResponseType> => {
+  const response = await fetch(
+    `${BaseAPIPath}/conversations/${conversationId}`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  try {
     if (!response.ok) {
       if (response.status === 404) {
         // Conversation not found, set error and return empty messages
-        console.error('Conversation not found')
+        console.error("Conversation not found");
         return [];
       }
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -88,10 +107,10 @@ export const LoadConversationHistory = async (conversationId: string): Promise<L
     // @ts-expect-error // TypeScript is not able to infer the type correctly here
     return messageData;
   } catch (error) {
-    console.error('Error fetching conversation history:', error);
+    console.error("Error fetching conversation history:", error);
     return null;
   }
-}
+};
 
 type ConversationListItem = {
   id: string;
@@ -99,98 +118,112 @@ type ConversationListItem = {
   date: string;
   createdAt: number;
   isPinned: boolean;
-}
+};
 
-export const GetConversationsList = async (): Promise<ConversationListItem[] | null> => {
-
+export const GetConversationsList = async (): Promise<
+  ConversationListItem[] | null
+> => {
   interface ConversationApiResponse {
-    id: string
-    title: string
-    created_at: number
-    is_pinned: boolean
+    id: string;
+    title: string;
+    created_at: number;
+    is_pinned: boolean;
   }
 
-
-  const response = await fetch(`${BaseAPIPath}/conversations`)
+  const response = await fetch(`${BaseAPIPath}/conversations`);
 
   if (!response.ok) {
-    console.error('Failed to fetch conversations list')
-    return null
+    console.error("Failed to fetch conversations list");
+    return null;
   }
 
-  const data = await response.json() as ConversationApiResponse[]
+  const data = (await response.json()) as ConversationApiResponse[];
   const conversations = data.map((conv) => ({
     id: conv.id,
     title: conv.title,
     date: formatRelativeTime(conv.created_at * 1000),
     createdAt: conv.created_at * 1000,
-    isPinned: conv.is_pinned
-  }))
+    isPinned: conv.is_pinned,
+  }));
 
-  return conversations
-
-}
+  return conversations;
+};
 
 export const TogglePinConversation = async (conversationId: string) => {
-  const response = await fetch(`${BaseAPIPath}/conversations/${conversationId}/pin`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  const response = await fetch(
+    `${BaseAPIPath}/conversations/${conversationId}/pin`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
     },
-  });
-  
-  if (!response.ok) {
-    console.error('Failed to toggle pin status')
-    return false
-  }
-  return true
-}
+  );
 
-export const CreateConversation = async (conversationId: string, initialChat: string) => {
+  if (!response.ok) {
+    console.error("Failed to toggle pin status");
+    return false;
+  }
+  return true;
+};
+
+export const CreateConversation = async (
+  conversationId: string,
+  initialChat: string,
+) => {
   const response = await fetch(`${BaseAPIPath}/create-conversation`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({ conversationId, initialChat }),
   });
-  
+
   if (!response.ok) {
-    console.error('Failed to create conversation')
-    return null
+    console.error("Failed to create conversation");
+    return null;
   }
-  
-  const data = await response.json()
-  return data.conversationId as string
-}
+
+  const data = await response.json();
+  return data.conversationId as string;
+};
 
 export const DeleteConversation = async (conversationId: string) => {
-  const response = await fetch(`${BaseAPIPath}/conversations/${conversationId}`, {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
+  const response = await fetch(
+    `${BaseAPIPath}/conversations/${conversationId}`,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
     },
-  });
-  
-  if (!response.ok) {
-    console.error('Failed to delete conversation')
-    return false
-  }
-  return true
-}
+  );
 
-export const RenameConversation = async (conversationId: string, newTitle: string): Promise<boolean> => {
-  const response = await fetch(`${BaseAPIPath}/conversations/${conversationId}/rename`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ new_title: newTitle }),
-  });
-  
   if (!response.ok) {
-    console.error('Failed to rename conversation')
-    return false
+    console.error("Failed to delete conversation");
+    return false;
   }
-  return true
-}
+  return true;
+};
+
+export const RenameConversation = async (
+  conversationId: string,
+  newTitle: string,
+): Promise<boolean> => {
+  const response = await fetch(
+    `${BaseAPIPath}/conversations/${conversationId}/rename`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ new_title: newTitle }),
+    },
+  );
+
+  if (!response.ok) {
+    console.error("Failed to rename conversation");
+    return false;
+  }
+  return true;
+};
