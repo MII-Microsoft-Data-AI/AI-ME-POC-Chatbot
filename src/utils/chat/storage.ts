@@ -1,12 +1,9 @@
-import type { ChatMode, PendingMessage } from '@/types/chat'
+import type { PendingMessage } from '@/types/chat'
 
 // Storage utilities untuk chat feature
-// Handle localStorage (chat mode) dan sessionStorage (pending messages)
-// Handle IndexedDB untuk file attachments
+// Handle sessionStorage (pending messages) and IndexedDB untuk file attachments
 export const STORAGE_KEYS = {
-  CHAT_MODE: 'chat-mode',
   PENDING_MESSAGE: 'pendingMessage',
-  PENDING_MODE: 'pendingMode',
   PENDING_ATTACHMENTS: 'pendingAttachments',
 } as const
 
@@ -189,24 +186,18 @@ async function smartGetAttachments(): Promise<File[]> {
   return files
 }
 
-export function getChatMode(): ChatMode | null {
-  if (typeof window === 'undefined') return null
-  
-  const saved = localStorage.getItem(STORAGE_KEYS.CHAT_MODE)
-  return saved === 'image' ? 'image' : saved === 'chat' ? 'chat' : null
+export function getChatMode(): null {
+  return null
 }
 
-export function saveChatMode(mode: ChatMode): void {
-  if (typeof window === 'undefined') return
-  
-  localStorage.setItem(STORAGE_KEYS.CHAT_MODE, mode)
+export function saveChatMode(): void {
+  // No longer needed
 }
 
 export async function getPendingMessage(): Promise<PendingMessage | null> {
   if (typeof window === 'undefined') return null
   
   const message = sessionStorage.getItem(STORAGE_KEYS.PENDING_MESSAGE)
-  const mode = sessionStorage.getItem(STORAGE_KEYS.PENDING_MODE) as ChatMode
 
   if (!message) return null
 
@@ -215,20 +206,17 @@ export async function getPendingMessage(): Promise<PendingMessage | null> {
   
   return {
     message,
-    mode: mode || 'chat',
     attachmentFile: attachmentFiles,
   }
 }
 
 export async function savePendingMessage(
   message: string,
-  mode: ChatMode,
   attachmentsFile: File[]
 ): Promise<void> {
   if (typeof window === 'undefined') return
   
   sessionStorage.setItem(STORAGE_KEYS.PENDING_MESSAGE, message)
-  sessionStorage.setItem(STORAGE_KEYS.PENDING_MODE, mode)
 
   // ✅ PHASE 1.4: Use smart storage instead of direct IDB
   await smartSaveAttachments(attachmentsFile)
@@ -238,7 +226,6 @@ export async function clearPendingMessage(): Promise<void> {
   if (typeof window === 'undefined') return
   
   sessionStorage.removeItem(STORAGE_KEYS.PENDING_MESSAGE)
-  sessionStorage.removeItem(STORAGE_KEYS.PENDING_MODE)
   // ✅ PHASE 1.4: Clear smart storage keys
   sessionStorage.removeItem('pendingAttachmentsSmall')
   sessionStorage.removeItem('hasLargeAttachments')

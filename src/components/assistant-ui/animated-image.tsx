@@ -1,47 +1,38 @@
-"use client";
+import React, { useState } from 'react'
+import Image from 'next/image'
 
-import { useState } from "react";
-import type React from "react";
-import { cn } from "@/lib/utils";
+interface AnimatedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {}
 
-export const AnimatedImage = ({
-  className,
-  alt,
+export const AnimatedImage: React.FC<AnimatedImageProps> = ({
   src,
+  alt = 'Generated image',
+  className,
   ...props
-}: React.ImgHTMLAttributes<HTMLImageElement>) => {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [hasError, setHasError] = useState(false);
+}) => {
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Handle Blob src type by converting to string
+  let imageSrc = src
+  if (src instanceof Blob) {
+    imageSrc = URL.createObjectURL(src)
+  }
+
+  if (!imageSrc) {
+    return null
+  }
 
   return (
-    <span className="block relative my-4 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
-      {/* Loading skeleton */}
-      {!isLoaded && !hasError && (
-        <span className="absolute inset-0 flex items-center justify-center animate-pulse bg-gray-200">
-          <span className="text-sm text-gray-400">Loading image...</span>
-        </span>
+    <div className="relative w-full max-w-2xl mx-auto rounded-lg overflow-hidden">
+      {isLoading && (
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse" />
       )}
-
-      {/* Actual image */}
       <img
-        src={src}
-        alt={alt || "Generated Image"}
-        className={cn(
-          "w-full h-auto object-contain transition-opacity duration-500",
-          isLoaded ? "opacity-100" : "opacity-0",
-          className
-        )}
-        onLoad={() => setIsLoaded(true)}
-        onError={() => setHasError(true)}
-        {...props}
+        src={String(imageSrc)}
+        alt={alt}
+        onLoad={() => setIsLoading(false)}
+        className={`w-full h-auto rounded-lg fade-in ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-500 ${className || ''}`}
+        {...(props as React.ImgHTMLAttributes<HTMLImageElement>)}
       />
-
-      {/* Error state */}
-      {hasError && (
-        <span className="absolute inset-0 flex items-center justify-center bg-red-50">
-          <span className="text-sm text-red-500">Failed to load image</span>
-        </span>
-      )}
-    </span>
-  );
-};
+    </div>
+  )
+}

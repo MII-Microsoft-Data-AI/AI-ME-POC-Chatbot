@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useThreadRuntime } from '@assistant-ui/react'
-import type { ChatMode } from '@/types/chat'
 import { savePendingMessage } from '@/utils/chat/storage'
 import { generateConversationId, withTimeout, CONVERSATION_CONSTANTS } from '@/utils/chat/conversation'
 import { CreateConversation } from '@/lib/integration/client/chat-conversation'
@@ -9,7 +8,7 @@ import { PerformanceLogger } from '@/utils/performance-logger'
 
 // Hook untuk handle conversation creation flow
 // ✅ PHASE 1: Optimized redirect pattern with improved storage and timing
-export function useConversationCreator(mode: ChatMode) {
+export function useConversationCreator() {
   const router = useRouter()
   const threadRuntime = useThreadRuntime()
   const [isCreating, setIsCreating] = useState(false)
@@ -60,9 +59,9 @@ export function useConversationCreator(mode: ChatMode) {
         // ✅ Small delay to ensure DB write is committed before redirect
         await new Promise(resolve => setTimeout(resolve, 100))
 
-        // ✅ PHASE 1.4: Use smart storage instead of direct IDB
-        await savePendingMessage(message, mode, attachmentFile)
-        perf.checkpoint('Message saved to storage')
+         // ✅ PHASE 1.4: Use smart storage instead of direct IDB
+         await savePendingMessage(message, attachmentFile)
+         perf.checkpoint('Message saved to storage')
 
         // Redirect to conversation page
         router.push(`/chat/${createdId}`)
@@ -79,7 +78,7 @@ export function useConversationCreator(mode: ChatMode) {
     return () => {
       threadRuntime.composer.send = originalSend
     }
-  }, [threadRuntime, router, mode])
+  }, [threadRuntime, router])
 
   return {
     isCreating,

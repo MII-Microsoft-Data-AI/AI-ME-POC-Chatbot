@@ -201,11 +201,6 @@ export function getPageTitle(pathname: string): string {
     return 'Chat'
   }
   
-  // Handle image generation page
-  if (pathname === '/image-generation') {
-    return 'Image Generation'
-  }
-  
   // Find matching navigation item
   const allItems = [...siteConfig.navigation.sidebar, ...siteConfig.navigation.menu]
   const matchingItem = allItems.find(item => pathname.startsWith(item.path))

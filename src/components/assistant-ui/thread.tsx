@@ -21,7 +21,6 @@ import {
   Square,
   Loader2,
   MessageSquare,
-  Image,
   History,
   Plus,
   Paperclip,
@@ -47,7 +46,6 @@ import { getPersonalizedSiteConfig } from "@/lib/personalized-config";
 import { usePersonalizationContext } from "@/contexts/PersonalizationContext";
 import { getTimeOfDay } from "@/utils/time-utils";
 import { ChatMessageSkeleton } from "@/components/ChatMessageSkeleton";
-import { ModeSelector } from "@/components/ModeSelector";
 import { Reasoning, ReasoningGroup } from "@/components/assistant-ui/reasoning";
 
 const Settings = {
@@ -56,16 +54,12 @@ const Settings = {
   regenerate: false, // Currently we dont support regenerating assistant messages
 }
 
-export type ChatMode = 'chat' | 'image'
-
 interface ThreadProps {
   isLoading?: boolean;
   isCreating?: boolean;
-  mode?: ChatMode;
-  onModeChange?: (mode: ChatMode) => void;
 }
 
-export const Thread: FC<ThreadProps> = ({ isLoading = false, isCreating = false, mode = 'chat', onModeChange }) => {
+export const Thread: FC<ThreadProps> = ({ isLoading = false, isCreating = false }) => {
   const isThreadEmpty = useAssistantState(({ thread }) => thread.messages.length === 0);
 
   return (
@@ -80,7 +74,7 @@ export const Thread: FC<ThreadProps> = ({ isLoading = false, isCreating = false,
           <ThreadPrimitive.Viewport className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-4 pt-10">
             {
               !isLoading &&
-              <ThreadWelcome mode={mode} onModeChange={onModeChange} isCreating={isCreating} />
+              <ThreadWelcome isCreating={isCreating} />
             }
 
             {isLoading ? (
@@ -99,7 +93,7 @@ export const Thread: FC<ThreadProps> = ({ isLoading = false, isCreating = false,
 
             {!isThreadEmpty && !isLoading && (
                <div className="sticky bottom-0 z-10 bg-background pb-4 pt-2">
-                  <Composer isDisabled={isLoading} isCreating={isCreating} mode={mode} onModeChange={onModeChange} />
+                  <Composer isDisabled={isLoading} isCreating={isCreating} />
                </div>
             )}
           </ThreadPrimitive.Viewport>
@@ -149,7 +143,7 @@ const ThreadWelcomeSuggestions: FC = () => {
     );
   };
 
-const ThreadWelcome: FC<{ mode?: ChatMode; onModeChange?: (mode: ChatMode) => void; isCreating?: boolean }> = ({ mode = 'chat', onModeChange, isCreating }) => {
+const ThreadWelcome: FC<{ isCreating?: boolean }> = ({ isCreating }) => {
   const { settings } = usePersonalizationContext()
   const config = getPersonalizedSiteConfig(settings)
   const time = getTimeOfDay()
@@ -186,7 +180,7 @@ const ThreadWelcome: FC<{ mode?: ChatMode; onModeChange?: (mode: ChatMode) => vo
 
             {/* Centered Composer */}
             <div className="w-full pt-4 space-y-8 flex flex-col items-center">
-                 <Composer isCreating={isCreating} mode={mode} onModeChange={onModeChange} variant="centered" />
+                 <Composer isCreating={isCreating} variant="centered" />
                  
                  {/* Suggestions */}
                  <ThreadWelcomeSuggestions />
@@ -202,12 +196,10 @@ const ThreadWelcome: FC<{ mode?: ChatMode; onModeChange?: (mode: ChatMode) => vo
 interface ComposerProps {
   isDisabled?: boolean;
   isCreating?: boolean;
-  mode?: ChatMode;
-  onModeChange?: (mode: ChatMode) => void;
   variant?: 'centered' | 'footer';
 }
 
-const Composer: FC<ComposerProps> = ({ isDisabled = false, isCreating = false, mode = 'chat', onModeChange, variant = 'footer' }) => {
+const Composer: FC<ComposerProps> = ({ isDisabled = false, isCreating = false, variant = 'footer' }) => {
   const { settings } = usePersonalizationContext()
   const threadExist = useAssistantState(({thread}) => thread.messages.length > 0)
   const text = useAssistantState(({composer}) => composer.text)
@@ -221,7 +213,7 @@ const Composer: FC<ComposerProps> = ({ isDisabled = false, isCreating = false, m
         isDisabled && "opacity-50 pointer-events-none"
       )}>
         <ComposerPrimitive.Input
-          placeholder={mode === 'image' ? "Describe the image you want to create..." : "How can I help you today?"}
+          placeholder="How can I help you today?"
           className="w-full resize-none bg-transparent px-4 py-4 text-base outline-none placeholder:text-zinc-400 min-h-[52px] max-h-32"
           rows={1}
           autoFocus={!isDisabled}
@@ -237,9 +229,6 @@ const Composer: FC<ComposerProps> = ({ isDisabled = false, isCreating = false, m
         <div className="flex items-center justify-between px-3 pb-3 pt-1">
            <div className="flex items-center gap-2">
              <ComposerAddAttachment />
-             {onModeChange && (
-                  <ModeSelector mode={mode} onModeChange={onModeChange} primaryColor={settings.primaryColor} />
-              )}
            </div>
            
            <div className="flex items-center gap-2">
@@ -305,7 +294,6 @@ const AssistantMessage: FC = () => {
               Text: MarkdownText,
               tools: { Fallback: ToolFallback },
               Reasoning: Reasoning,
-              ReasoningGroup: ReasoningGroup
             }}
           />
           <MessageError />

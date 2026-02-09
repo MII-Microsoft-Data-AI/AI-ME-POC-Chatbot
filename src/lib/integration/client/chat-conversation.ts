@@ -12,7 +12,6 @@ import {
   loadFromLanggraphStateJSON,
 } from "@/utils/langgraph/to-assistant-ui";
 import { useCustomDataStreamRuntime } from "@/utils/custom-data-stream-runtime";
-import type { ChatMode } from "@/components/assistant-ui/thread";
 import { VisionImageAdapter } from "@/utils/chat/attachment-adapter";
 
 const BaseAPIPath = "/api/be";
@@ -24,10 +23,9 @@ export const CompositeAttachmentsAdapter = new CompositeAttachmentAdapter([
 ]);
 
 // First Chat API Runtime (without conversation ID parameters)
-export const FirstChatAPIRuntime = (mode: ChatMode = "chat") =>
+export const FirstChatAPIRuntime = () =>
   useCustomDataStreamRuntime({
     api: `${BaseAPIPath}/chat`,
-    body: { mode }, // Pass mode to backend
     adapters: {
       attachments: CompositeAttachmentsAdapter,
     },
@@ -60,11 +58,9 @@ export async function GetLastConversationId(): Promise<string | null> {
 export const ChatWithConversationIDAPIRuntime = (
   conversationId: string,
   historyAdapter: ThreadHistoryAdapter,
-  mode: ChatMode = "chat",
 ) =>
   useCustomDataStreamRuntime({
     api: `${BaseAPIPath}/conversations/${conversationId}/chat`,
-    body: { mode }, // Pass mode to backend
     adapters: {
       history: historyAdapter,
       attachments: CompositeAttachmentsAdapter,
