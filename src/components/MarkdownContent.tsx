@@ -34,7 +34,7 @@ export default function MarkdownContent({ content, className = '' }: MarkdownCon
     },
     pre: ({ children }) => <>{children}</>,
     table: ({ children }) => (
-      <div className="overflow-x-auto my-4">
+      <div className="w-full overflow-x-auto my-4">
         <table className="min-w-full divide-y divide-gray-700 border border-gray-700 rounded-t-lg overflow-hidden">
           {children}
         </table>

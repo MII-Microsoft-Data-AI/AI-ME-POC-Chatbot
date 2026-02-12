@@ -25,27 +25,46 @@ import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import { CustomDocReference, CustomLinkReference } from "./custom-markdown";
 
-
 function normalizeCustomMathTags(input: string): string {
   return (
     input
       // Convert [/math]...[/math] to $$...$$
-      .replace(/\[\/math\]([\s\S]*?)\[\/math\]/g, (_, content) => `$$${content.trim()}$$`)
+      .replace(
+        /\[\/math\]([\s\S]*?)\[\/math\]/g,
+        (_, content) => `$$${content.trim()}$$`,
+      )
       // Convert [/inline]...[/inline] to $...$
-      .replace(/\[\/inline\]([\s\S]*?)\[\/inline\]/g, (_, content) => `$${content.trim()}$`)
+      .replace(
+        /\[\/inline\]([\s\S]*?)\[\/inline\]/g,
+        (_, content) => `$${content.trim()}$`,
+      )
       // Convert \( ... \) to $...$ (inline math) - handles both single and double backslashes
-      .replace(/\\{1,2}\(([\s\S]*?)\\{1,2}\)/g, (_, content) => `$${content.trim()}$`)
+      .replace(
+        /\\{1,2}\(([\s\S]*?)\\{1,2}\)/g,
+        (_, content) => `$${content.trim()}$`,
+      )
       // Convert \[ ... \] to $$...$$ (block math) - handles both single and double backslashes
-      .replace(/\\{1,2}\[([\s\S]*?)\\{1,2}\]/g, (_, content) => `$$${content.trim()}$$`)
+      .replace(
+        /\\{1,2}\[([\s\S]*?)\\{1,2}\]/g,
+        (_, content) => `$$${content.trim()}$$`,
+      )
   );
 }
 
 function processCustomPatterns(input: string): string {
-  return input
-    // Convert [doc-(id)] to HTML that react-markdown can parse
-    .replace(/\[doc-\(([^)]+)\)\]/g, '<span class="custom-doc-placeholder" data-id="$1"></span>')
-    // Convert [link-(url)] to HTML that react-markdown can parse  
-    .replace(/\[link-\(([^)]+)\)\]/g, '<span class="custom-link-placeholder" data-url="$1"></span>');
+  return (
+    input
+      // Convert [doc-(id)] to HTML that react-markdown can parse
+      .replace(
+        /\[doc-\(([^)]+)\)\]/g,
+        '<span class="custom-doc-placeholder" data-id="$1"></span>',
+      )
+      // Convert [link-(url)] to HTML that react-markdown can parse
+      .replace(
+        /\[link-\(([^)]+)\)\]/g,
+        '<span class="custom-link-placeholder" data-url="$1"></span>',
+      )
+  );
 }
 
 function combinePreprocessors(input: string): string {
@@ -61,7 +80,7 @@ const MarkdownTextImpl = () => {
       className="aui-md"
       componentsByLanguage={{
         mermaid: {
-          SyntaxHighlighter: MermaidDiagram 
+          SyntaxHighlighter: MermaidDiagram,
         },
       }}
       components={defaultComponents}
@@ -81,7 +100,7 @@ const CodeHeader: FC<CodeHeaderProps> = ({ language, code }) => {
   return (
     <div className="aui-code-header-root mt-4 flex items-center justify-between gap-4 rounded-t-lg bg-muted-foreground/15 px-4 py-2 text-sm font-semibold text-foreground dark:bg-muted-foreground/20">
       <span className="aui-code-header-language lowercase [&>span]:text-xs">
-        {language != 'unknown' ? language : ''}
+        {language != "unknown" ? language : ""}
       </span>
       <TooltipIconButton tooltip="Copy" onClick={onCopy}>
         {!isCopied && <CopyIcon />}
@@ -206,13 +225,15 @@ const defaultComponents = memoizeMarkdownComponents({
     <hr className={cn("aui-md-hr my-5 border-b", className)} {...props} />
   ),
   table: ({ className, ...props }) => (
-    <table
-      className={cn(
-        "aui-md-table my-5 w-full border-separate border-spacing-0 overflow-y-auto",
-        className,
-      )}
-      {...props}
-    />
+    <div className="w-full overflow-x-auto my-5">
+      <table
+        className={cn(
+          "aui-md-table w-full border-separate border-spacing-0",
+          className,
+        )}
+        {...props}
+      />
+    </div>
   ),
   th: ({ className, ...props }) => (
     <th
@@ -272,24 +293,34 @@ const defaultComponents = memoizeMarkdownComponents({
   CodeHeader,
   img: AnimatedImage,
   // Custom span handler for placeholder components
-  span: ({ className, children, ...props }: React.HTMLAttributes<HTMLSpanElement> & { children?: React.ReactNode }) => {
-    // Handle custom doc 
+  span: ({
+    className,
+    children,
+    ...props
+  }: React.HTMLAttributes<HTMLSpanElement> & {
+    children?: React.ReactNode;
+  }) => {
+    // Handle custom doc
     // format: [doc-(...)]
-    if (className === 'custom-doc-placeholder') {
+    if (className === "custom-doc-placeholder") {
       const dataProps = props as Record<string, string>;
-      const id = dataProps['data-id'];
+      const id = dataProps["data-id"];
       return <CustomDocReference id={id} />;
     }
-    
+
     // Handle custom link placeholders
     // format: [link-(...)]
-    if (className === 'custom-link-placeholder') {
+    if (className === "custom-link-placeholder") {
       const dataProps = props as Record<string, string>;
-      const url = dataProps['data-url'];
+      const url = dataProps["data-url"];
       return <CustomLinkReference url={url} />;
     }
-    
+
     // Default span behavior
-    return <span className={className} {...props}>{children}</span>;
+    return (
+      <span className={className} {...props}>
+        {children}
+      </span>
+    );
   },
 });
