@@ -20,78 +20,9 @@ from lib.database import db_manager
 
 class ChatRequest(BaseModel):
     messages: list
-    mode: str = "chat"  # "chat" or "image"
 
 
 chat_conversation_route = APIRouter()
-
-
-# Initialize Azure OpenAI client for DALL-E
-def get_dalle_client():
-    return AzureOpenAI(
-        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2025-01-01-preview"),
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-    )
-
-
-async def generate_image_stream(prompt: str, conversation_id: str):
-    """Generate image using DALL-E and return as stream format compatible with assistant-ui"""
-    import uuid
-    from langchain_core.messages import HumanMessage, AIMessage
-
-    message_id = str(uuid.uuid4())
-
-    try:
-        # Send start message with conversation ID
-        yield f"f:{json.dumps({'messageId': message_id, 'conversationId': conversation_id})}\n"
-
-        client = get_dalle_client()
-        deployment_name = os.getenv("AZURE_OPENAI_DALLE_DEPLOYMENT_NAME", "dall-e-3")
-
-        # Generate image
-        result = client.images.generate(
-            model=deployment_name,
-            prompt=prompt,
-            size="1024x1024",
-            quality="standard",
-            style="vivid",
-            n=1,
-        )
-
-        image_url = result.data[0].url
-        revised_prompt = result.data[0].revised_prompt or prompt
-
-        # Format response as markdown
-        response_text = (
-            f"![Generated Image]({image_url})\n\n*Revised prompt: {revised_prompt}*"
-        )
-
-        # Save to LangGraph state FIRST before streaming
-        try:
-            graph = get_graph()
-            graph.update_state(
-                config={"configurable": {"thread_id": conversation_id}},
-                values={
-                    "messages": [
-                        HumanMessage(content=prompt),
-                        AIMessage(content=response_text),
-                    ]
-                },
-            )
-            print(f"✅ Saved image generation to LangGraph state: {conversation_id}")
-        except Exception as e:
-            print(f"❌ Failed to save to LangGraph state: {str(e)}")
-
-        # Send text delta (0:) - content must be JSON string
-        yield f"0:{json.dumps(response_text)}\n"
-
-        # Send finish message (d:)
-        yield f"d:{json.dumps({'finishReason': 'stop', 'usage': {'promptTokens': 0, 'completionTokens': 0}})}\n"
-
-    except Exception as e:
-        error_message = f"Failed to generate image: {str(e)}"
-        yield f"3:{json.dumps(error_message)}\n"
 
 
 class CreateConversationRequest(BaseModel):
@@ -286,54 +217,25 @@ async def chat_conversation(
 
     last_message = request.messages[-1] if request.messages else ""
 
-    # Route based on mode (same as /chat endpoint)
-    if request.mode == "image":
-        # Extract text from message content
-        message_content = last_message.get("content", "")
-        if isinstance(message_content, list):
-            prompt = ""
-            for item in message_content:
-                if isinstance(item, dict) and item.get("type") == "text":
-                    prompt = item.get("text", "")
-                    break
-        else:
-            prompt = str(message_content)
+    # Use LangGraph for chat
+    last_message_langgraph_content = from_assistant_ui_contents_to_langgraph_contents(
+        last_message["content"]
+    )
+    input_message = [{"role": "user", "content": last_message_langgraph_content}]
 
-        if not prompt:
-            return {"error": "No prompt provided for image generation"}
+    graph = get_graph()
 
-        # Generate image using DALL-E
-        return StreamingResponse(
-            generate_image_stream(prompt, conversation_id),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Content-Type": "text/plain; charset=utf-8",
-                "Connection": "keep-alive",
-                "x-vercel-ai-data-stream": "v1",
-                "x-vercel-ai-ui-message-stream": "v1",
-            },
-        )
-    else:
-        # Normal chat mode - use LangGraph
-        last_message_langgraph_content = (
-            from_assistant_ui_contents_to_langgraph_contents(last_message["content"])
-        )
-        input_message = [{"role": "user", "content": last_message_langgraph_content}]
-
-        graph = get_graph()
-
-        return StreamingResponse(
-            generate_stream(graph, input_message, conversation_id),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Content-Type": "text/plain; charset=utf-8",
-                "Connection": "keep-alive",
-                "x-vercel-ai-data-stream": "v1",
-                "x-vercel-ai-ui-message-stream": "v1",
-            },
-        )
+    return StreamingResponse(
+        generate_stream(graph, input_message, conversation_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Content-Type": "text/plain; charset=utf-8",
+            "Connection": "keep-alive",
+            "x-vercel-ai-data-stream": "v1",
+            "x-vercel-ai-ui-message-stream": "v1",
+        },
+    )
 
 
 @chat_conversation_route.delete("/conversations/{conversation_id}")

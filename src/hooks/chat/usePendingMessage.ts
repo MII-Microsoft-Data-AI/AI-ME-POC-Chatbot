@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useThreadRuntime, type ThreadRuntime } from '@assistant-ui/react'
-import type { ChatMode } from '@/types/chat'
 import { getPendingMessage, clearPendingMessage } from '@/utils/chat/storage'
 import { PerformanceLogger } from '@/utils/performance-logger'
 
 interface UsePendingMessageOptions {
   isLoading: boolean
-  onModeChange: (mode: ChatMode) => void
 }
 
 // Helper: Wait for runtime to be ready
@@ -27,7 +25,7 @@ function delay(ms: number): Promise<void> {
 
 // Hook para auto-send pending message setelah redirect dari new chat
 // ✅ PHASE 1.2: Optimized dengan Promise-based approach (600ms -> 150ms)
-export function usePendingMessage({ isLoading, onModeChange }: UsePendingMessageOptions) {
+export function usePendingMessage({ isLoading }: UsePendingMessageOptions) {
   const threadRuntime = useThreadRuntime()
   const [hasSentPendingMessage, setHasSentPendingMessage] = useState(false)
 
@@ -46,11 +44,6 @@ export function usePendingMessage({ isLoading, onModeChange }: UsePendingMessage
         // Clear storage immediately
         await clearPendingMessage()
         perf.checkpoint('Storage cleared')
-
-        // Set mode if needed
-        if (pending.mode) {
-          onModeChange(pending.mode)
-        }
 
         // Wait for runtime to be ready
         await waitForRuntimeReady(threadRuntime)
@@ -83,7 +76,7 @@ export function usePendingMessage({ isLoading, onModeChange }: UsePendingMessage
     }
 
     processPendingMessage()
-  }, [threadRuntime, isLoading, hasSentPendingMessage, onModeChange])
+  }, [threadRuntime, isLoading, hasSentPendingMessage])
 
   return { hasSentPendingMessage }
 }

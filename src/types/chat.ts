@@ -1,9 +1,6 @@
-// Chat types: mode, pending message, conversation result
-export type ChatMode = 'chat' | 'image'
-
+// Chat types: pending message, conversation result
 export interface PendingMessage {
   message: string
-  mode: ChatMode
   attachmentFile: File[]
 }
 

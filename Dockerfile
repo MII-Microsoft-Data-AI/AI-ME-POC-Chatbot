@@ -22,19 +22,20 @@ FROM node:20-alpine as frontend-builder
 
 WORKDIR /app/frontend
 
-# Copy package files
-COPY package.json package-lock.json* bun.lock* ./
+# Install bun
+RUN npm install -g bun
 
-# Install dependencies using available package manager
-RUN if [ -f bun.lock ]; then npm install -g bun && bun install --frozen-lockfile; \
-    elif [ -f package-lock.json ]; then npm ci; \
-    else npm install; fi
+# Copy package files
+COPY package.json bun.lock* ./
+
+# Install dependencies using bun
+RUN bun install --frozen-lockfile
 
 # Copy frontend source
 COPY . .
 
 # Build Next.js app
-RUN npm run build
+RUN bun run build
 
 # Final stage: Runtime
 FROM python:3.12-slim
@@ -79,7 +80,7 @@ BACKEND_PID=$!
 # Start frontend
 echo "🎨 Starting Next.js frontend on port 8080..."
 cd /app/frontend
-npm run start &
+bun run start &
 FRONTEND_PID=$!
 
 # Wait for both services

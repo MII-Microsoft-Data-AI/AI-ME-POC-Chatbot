@@ -1,39 +1,39 @@
 """LangGraph agent implementation."""
-from typing import Dict, List, Literal, TypedDict, Annotated
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
-from langgraph.graph import StateGraph, END
+
+from typing import Annotated, Dict, List, Literal, TypedDict
+
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages.utils import count_tokens_approximately, trim_messages
+from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
 from lib.checkpointer import checkpointer
 
-from langchain_core.messages.utils import (
-    trim_messages,
-    count_tokens_approximately
-)
-
-from .tools import AVAILABLE_TOOLS
 from .model import model
 from .prompt import FALLBACK_SYSTEM_PROMPT, get_prompty_client
-from .utils import sanitize_and_validate_messages, change_file_to_url
+from .tools import AVAILABLE_TOOLS
+from .utils import change_file_to_url, sanitize_and_validate_messages
+
 
 class AgentState(TypedDict):
     """State for the agent graph."""
+
     messages: Annotated[List[BaseMessage], add_messages]
 
 
 def should_continue(state: AgentState) -> Literal["tools", "end"]:
     """Determine whether to continue to tools or end the conversation.
-    
+
     Args:
         state: Current agent state
-        
+
     Returns:
         str: Next node to execute ("tools" or "end")
     """
     messages = state["messages"]
     last_message = messages[-1]
-    
+
     # If the LLM makes a tool call, then we route to the "tools" node
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
         # Debug: Print tool calls
@@ -46,14 +46,13 @@ def should_continue(state: AgentState) -> Literal["tools", "end"]:
     return "end"
 
 
-
-def call_model(state: AgentState, config = None) -> Dict[str, List[BaseMessage]]:
+def call_model(state: AgentState, config=None) -> Dict[str, List[BaseMessage]]:
     """Call the model with the current state.
-    
+
     Args:
         state: Current agent state
         config: Configuration dictionary
-        
+
     Returns:
         Dict containing the updated messages
     """
@@ -71,31 +70,32 @@ def call_model(state: AgentState, config = None) -> Dict[str, List[BaseMessage]]
 
     # Sanitize and validate messages to ensure proper tool call/response pairing
     messages = sanitize_and_validate_messages(messages)
-    
+
     # Convert chatbot://{id} URLs to temporary blob URLs with SAS tokens
     messages = change_file_to_url(messages)
 
     print(messages)
 
-    prompty = get_prompty_client()
-    prompt = prompty.get_prompt('Main Chat Agent')
-    if (prompt is None):
+    try:
+        prompty = get_prompty_client()
+        prompt = prompty.get_prompt("Main Chat Agent")
+    except:
         prompt = FALLBACK_SYSTEM_PROMPT
 
     system_msg = SystemMessage(content=prompt.strip())
     messages = [system_msg] + messages
-        
+
     # Bind tools to the model
     model_with_tools = model.bind_tools(AVAILABLE_TOOLS)
     response = model_with_tools.invoke(messages)
-    
+
     # Return the response
     return {"messages": [response]}
 
 
 def get_graph():
     """Get or create the graph instance.
-    
+
     Graph is rebuilt on every call to ensure tool changes are picked up.
     This may add slight latency but ensures correctness during development.
     """
@@ -126,5 +126,5 @@ def get_graph():
 
     # Compile the graph
     graph = workflow.compile(checkpointer=checkpointer_ins)
-    
+
     return graph

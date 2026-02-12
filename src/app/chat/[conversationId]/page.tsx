@@ -6,7 +6,6 @@ import {
   ChatWithConversationIDAPIRuntime,
   CompositeAttachmentsAdapter,
 } from "@/lib/integration/client/chat-conversation";
-import { useChatMode } from "@/hooks/chat/useChatMode";
 import { useConversationHistory } from "@/hooks/chat/useConversationHistory";
 import { ConversationContent } from "@/components/features/chat/ConversationContent";
 import { ErrorState } from "@/components/features/chat/ErrorState";
@@ -18,9 +17,6 @@ function ConversationPage() {
   const params = useParams();
   const conversationId = params.conversationId as string;
 
-  // Mode state management
-  const { mode, setMode } = useChatMode();
-
   // History loading
   const { historyAdapter, isLoadingHistory, error } =
     useConversationHistory(conversationId);
@@ -29,7 +25,6 @@ function ConversationPage() {
   // const runtime = ChatWithConversationIDAPIRuntime(
   //   conversationId,
   //   historyAdapter,
-  //   mode,
   // );
 
   const runtime = useDataStreamRuntime({
@@ -49,8 +44,6 @@ function ConversationPage() {
           <>
             <GenerateImageUI />
             <ConversationContent
-              mode={mode}
-              onModeChange={setMode}
               isLoading={isLoadingHistory}
             />
           </>

@@ -83,16 +83,24 @@ export const GenerateImageUI = makeAssistantToolUI<GenerateImageArgs, GenerateIm
   toolName: "generate_image", // Must match backend tool name
   render: (data) => {
     console.log(data)
-    const { result, status } = data;
+    const { result, status, args } = data;
     // Tool outputs stream in; `result` will be `undefined` until the tool resolves.
 
     console.log("Image Generation Tool Status:", status);
     console.log("Image Generation Tool Result:", result);
 
     if (result) {
-      return <AnimatedImage
-        src={result}
-      />
+      return (
+        <div className="w-full max-w-2xl mx-auto pb-6">
+          <AnimatedImage
+            src={result}
+          />
+          <div className="mt-3 text-sm text-muted-foreground text-center">
+            <p className="font-medium">Prompt:</p>
+            <p className="italic">{args.prompt}</p>
+          </div>
+        </div>
+      )
     }
 
     if (status.type === 'running') {
@@ -104,3 +112,5 @@ export const GenerateImageUI = makeAssistantToolUI<GenerateImageArgs, GenerateIm
 
   },
 })
+
+
