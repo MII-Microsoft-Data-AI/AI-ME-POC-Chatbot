@@ -41,17 +41,19 @@ export const SyntaxHighlighter: FC<HighlighterProps> = ({
     "aui-shiki-base [&_pre]:overflow-x-auto [&_pre]:rounded-b-lg [&_pre]:!bg-muted/75 [&_pre]:p-4";
 
   return (
-    <ShikiHighlighter
-      {...props}
-      language={language}
-      theme={theme}
-      addDefaultStyles={addDefaultStyles}
-      showLanguage={showLanguage}
-      defaultColor="light-dark()"
-      className={cn(BASE_STYLES, className)}
-    >
-      {code.trim()}
-    </ShikiHighlighter>
+    <>
+      <ShikiHighlighter
+        {...props}
+        language={language == "unknown" ? "text" : language}
+        theme={theme}
+        addDefaultStyles={addDefaultStyles}
+        showLanguage={showLanguage}
+        defaultColor="light-dark()"
+        className={cn(BASE_STYLES, className)}
+      >
+        {code.trim()}
+      </ShikiHighlighter>
+    </>
   );
 };
 
