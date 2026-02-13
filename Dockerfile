@@ -74,7 +74,7 @@ echo "🚀 Starting AI-ME POC Chatbot..."
 # Start backend in background
 echo "📦 Starting FastAPI backend on port 8081..."
 cd /app/backend
-python -m uvicorn main:app --host 0.0.0.0 --port 8081 &
+python -m uvicorn main:app --host 0.0.0.0 --port 8081 --workers 4 &
 BACKEND_PID=$!
 
 # Start frontend
