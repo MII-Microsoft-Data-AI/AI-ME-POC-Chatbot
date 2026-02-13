@@ -74,8 +74,6 @@ def call_model(state: AgentState, config=None) -> Dict[str, List[BaseMessage]]:
     # Convert chatbot://{id} URLs to temporary blob URLs with SAS tokens
     messages = change_file_to_url(messages)
 
-    print(messages)
-
     try:
         prompty = get_prompty_client()
         prompt = prompty.get_prompt("Main Chat Agent")
