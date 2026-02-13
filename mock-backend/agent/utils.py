@@ -160,11 +160,12 @@ def process_image_url_item(item: dict, use_base64: bool = True) -> dict:
         }
     }
         if use_base64 true
-    {
-        "type": "image",
-        "base64": "data:image/jpeg;base64,...",
-        "mime_type": "image/jpeg"
-    }
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": "data:image/jpg;base64,ASDAJSLDKJASD...."
+            }
+        }
 
     Args:
         item: Dictionary containing image_url content
@@ -199,12 +200,6 @@ def process_image_url_item(item: dict, use_base64: bool = True) -> dict:
                 if use_base64:
                     mime_type, blob_base64 = get_file_base64(attachment.blob_name)
                     base_64_compiled = f"data:{mime_type};base64,{blob_base64}"
-                    print(
-                        "THIS IS SPARTA",
-                        mime_type,
-                        blob_base64[:20],
-                        base_64_compiled[:30],
-                    )
                     return {
                         "type": "image_url",
                         "image_url": {
