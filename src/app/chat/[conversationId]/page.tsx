@@ -1,9 +1,8 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import {
-  ChatWithConversationIDAPIRuntime,
   CompositeAttachmentsAdapter,
 } from "@/lib/integration/client/chat-conversation";
 import { useConversationHistory } from "@/hooks/chat/useConversationHistory";
@@ -12,22 +11,22 @@ import { ErrorState } from "@/components/features/chat/ErrorState";
 import { ChatLayout } from "@/components/features/chat/ChatLayout";
 import { GenerateImageUI } from "@/components/assistant-ui/tool-ui/ImageGeneration";
 import { useDataStreamRuntime } from "@assistant-ui/react-data-stream";
+import { CustomLanggraphRuntimeProvider } from "@/components/assistant-ui/CustomLanggraphRuntime";
 
 function ConversationPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const conversationId = params.conversationId as string;
 
+  const useSse = searchParams.get("runtime") === "sse";
+
   // History loading
-  const { historyAdapter, isLoadingHistory, error } =
-    useConversationHistory(conversationId);
+  const { historyAdapter, isLoadingHistory, error } = useConversationHistory(
+    conversationId,
+    { enabled: !useSse },
+  );
 
-  // // Create runtime with conversation ID
-  // const runtime = ChatWithConversationIDAPIRuntime(
-  //   conversationId,
-  //   historyAdapter,
-  // );
-
-  const runtime = useDataStreamRuntime({
+  const legacyRuntime = useDataStreamRuntime({
     api: `/api/be/conversations/${conversationId}/chat`,
     adapters: {
       history: historyAdapter,
@@ -37,18 +36,29 @@ function ConversationPage() {
 
   return (
     <ChatLayout>
-      <AssistantRuntimeProvider runtime={runtime}>
-        {error ? (
-          <ErrorState error={error} onRetry={() => window.location.reload()} />
-        ) : (
-          <>
-            <GenerateImageUI />
-            <ConversationContent
-              isLoading={isLoadingHistory}
-            />
-          </>
-        )}
-      </AssistantRuntimeProvider>
+      {useSse ? (
+        <CustomLanggraphRuntimeProvider threadId={conversationId}>
+          {error ? (
+            <ErrorState error={error} onRetry={() => window.location.reload()} />
+          ) : (
+            <>
+              <GenerateImageUI />
+              <ConversationContent isLoading={isLoadingHistory} />
+            </>
+          )}
+        </CustomLanggraphRuntimeProvider>
+      ) : (
+        <AssistantRuntimeProvider runtime={legacyRuntime}>
+          {error ? (
+            <ErrorState error={error} onRetry={() => window.location.reload()} />
+          ) : (
+            <>
+              <GenerateImageUI />
+              <ConversationContent isLoading={isLoadingHistory} />
+            </>
+          )}
+        </AssistantRuntimeProvider>
+      )}
     </ChatLayout>
   );
 }

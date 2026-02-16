@@ -206,6 +206,38 @@ class DatabaseManager:
             return True
         except CosmosResourceNotFoundError:
             return False
+
+    # Assistant UI thread repo persistence
+    def get_conversation_repo(self, conversation_id: str, userid: str) -> Optional[Dict[str, Any]]:
+        """Get Assistant UI MessageRepository export for a conversation.
+
+        Stored as a separate Cosmos item keyed by ``{conversation_id}:repo``.
+        """
+        container = db_connection.get_conversations_container()
+        repo_id = f"{conversation_id}:repo"
+        try:
+            item = container.read_item(item=repo_id, partition_key=userid)
+            if not isinstance(item, dict):
+                return None
+            return item
+        except CosmosResourceNotFoundError:
+            return None
+
+    def put_conversation_repo(self, conversation_id: str, userid: str, repo: Dict[str, Any]) -> Dict[str, Any]:
+        """Upsert Assistant UI MessageRepository export for a conversation."""
+        container = db_connection.get_conversations_container()
+        now = int(time.time())
+        repo_id = f"{conversation_id}:repo"
+        document: Dict[str, Any] = {
+            "id": repo_id,
+            "type": "assistant_ui_repo",
+            "conversation_id": conversation_id,
+            "userid": userid,
+            "repo": repo,
+            "updated_at": now,
+        }
+        container.upsert_item(body=document)
+        return document
     
     # File operations
     def create_file(self, file_id: str, userid: str, filename: str, blob_name: str, workflow_id: Optional[str] = None) -> FileMetadata:

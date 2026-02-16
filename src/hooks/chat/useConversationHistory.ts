@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { ThreadHistoryAdapter } from '@assistant-ui/react'
 import { LoadConversationHistory } from '@/lib/integration/client/chat-conversation'
 import { STORAGE_KEYS } from '@/utils/chat/storage'
 
 // Hook untuk load conversation history dengan error handling
 // Returns: historyAdapter (memoized), isLoadingHistory, error
-export function useConversationHistory(conversationId: string) {
+export function useConversationHistory(conversationId: string, opts?: { enabled?: boolean }) {
+  const enabled = opts?.enabled ?? true
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -14,6 +15,12 @@ export function useConversationHistory(conversationId: string) {
     () => ({
       async load() {
         try {
+          if (!enabled) {
+            setIsLoadingHistory(false)
+            setError(null)
+            return { messages: [] }
+          }
+
           if (!conversationId) {
             return { messages: [] }
           }
@@ -60,7 +67,7 @@ export function useConversationHistory(conversationId: string) {
         // Message auto-saved by backend saat streaming selesai
       },
     }),
-    [conversationId]
+    [conversationId, enabled]
   )
 
   return {

@@ -1,6 +1,6 @@
 'use client'
 
-import { AssistantRuntimeProvider, useLocalRuntime } from '@assistant-ui/react'
+import { AssistantRuntimeProvider } from '@assistant-ui/react'
 import { NewChatContent } from '@/components/features/chat/NewChatContent'
 import { ChatLayout } from '@/components/features/chat/ChatLayout'
 import { FirstChatAPIRuntime } from '@/lib/integration/client/chat-conversation'

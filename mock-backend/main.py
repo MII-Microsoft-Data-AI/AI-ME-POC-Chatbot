@@ -94,12 +94,33 @@ async def health():
 
 # Add external routers
 from routes.chat_conversation import chat_conversation_route
+from routes.chat_first import chat_first_route
 from routes.file_indexing import file_indexing_route
 # from routes.image_generation import image_generation_route
 from routes.attachment import attachment_routes
+from routes.chat_sse import chat_sse_routes
+from routes.thread_repo import thread_repo_routes
 
 app.include_router(
     chat_conversation_route
+)
+
+# Compatibility endpoint for the New Chat page data-stream runtime
+app.include_router(
+    chat_first_route
+)
+
+# Assistant UI + LangGraph reference endpoints (SSE + thread repo persistence)
+app.include_router(
+    chat_sse_routes,
+    prefix="/api/v1",
+    tags=["assistant-ui"],
+)
+
+app.include_router(
+    thread_repo_routes,
+    prefix="/api/v1",
+    tags=["assistant-ui"],
 )
 
 app.include_router(
