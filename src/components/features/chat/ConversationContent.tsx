@@ -1,17 +1,17 @@
-'use client'
+"use client";
 
-import { Thread } from '@/components/assistant-ui/thread'
-import { usePendingMessage } from '@/hooks/chat/usePendingMessage'
+import { Thread } from "@/components/assistant-ui/thread";
+import { usePendingMessage } from "@/hooks/chat/usePendingMessage";
 
 interface ConversationContentProps {
-  isLoading: boolean
+  isLoading: boolean;
 }
 
 export function ConversationContent({
   isLoading,
 }: ConversationContentProps) {
   // Handle pending message from new chat redirect
-  usePendingMessage({ isLoading })
+  usePendingMessage({ isLoading });
 
-  return <Thread isLoading={isLoading} />
+  return <Thread isLoading={isLoading} />;
 }

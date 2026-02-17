@@ -1,35 +1,10 @@
 "use client";
 
-import {
-  CompositeAttachmentAdapter,
-  SimpleImageAttachmentAdapter,
-  ThreadHistoryAdapter,
-  ThreadMessage,
-} from "@assistant-ui/react";
+import { ThreadMessage } from "@assistant-ui/react";
 import { formatRelativeTime } from "@/utils/date-utils";
-import {
-  loadFromLanggraphStateHistoryJSON,
-  loadFromLanggraphStateJSON,
-} from "@/utils/langgraph/to-assistant-ui";
-import { useCustomDataStreamRuntime } from "@/utils/custom-data-stream-runtime";
-import { VisionImageAdapter } from "@/utils/chat/attachment-adapter";
+import { loadFromLanggraphStateJSON } from "@/utils/langgraph/to-assistant-ui";
 
 const BaseAPIPath = "/api/be";
-
-// Attachments Handler
-// For now, we only handle images -kaenova
-export const CompositeAttachmentsAdapter = new CompositeAttachmentAdapter([
-  new VisionImageAdapter(),
-]);
-
-// First Chat API Runtime (without conversation ID parameters)
-export const FirstChatAPIRuntime = () =>
-  useCustomDataStreamRuntime({
-    api: `${BaseAPIPath}/chat`,
-    adapters: {
-      attachments: CompositeAttachmentsAdapter,
-    },
-  });
 
 // Get Last Conversation ID from A User
 // The userid is obtained from the session in the backend
@@ -50,22 +25,6 @@ export async function GetLastConversationId(): Promise<string | null> {
     return null;
   }
 }
-
-// Chat API Runtime with Conversation ID parameters
-// You need to provide the conversationId and historyAdapter
-// The conversationId is obtained from the URL parameters
-// The historyAdapter is used to load and append messages to the thread
-export const ChatWithConversationIDAPIRuntime = (
-  conversationId: string,
-  historyAdapter: ThreadHistoryAdapter,
-) =>
-  useCustomDataStreamRuntime({
-    api: `${BaseAPIPath}/conversations/${conversationId}/chat`,
-    adapters: {
-      history: historyAdapter,
-      attachments: CompositeAttachmentsAdapter,
-    },
-  });
 
 type LoadHistoryResponseType =
   | { message: ThreadMessage; parentId: string | null }[]

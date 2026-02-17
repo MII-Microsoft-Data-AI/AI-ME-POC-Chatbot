@@ -1,86 +1,93 @@
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useThreadRuntime } from '@assistant-ui/react'
-import { savePendingMessage } from '@/utils/chat/storage'
-import { generateConversationId, withTimeout, CONVERSATION_CONSTANTS } from '@/utils/chat/conversation'
-import { CreateConversation } from '@/lib/integration/client/chat-conversation'
-import { PerformanceLogger } from '@/utils/performance-logger'
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useThreadRuntime } from "@assistant-ui/react";
+import { savePendingMessage } from "@/utils/chat/storage";
+import {
+  generateConversationId,
+  withTimeout,
+  CONVERSATION_CONSTANTS,
+} from "@/utils/chat/conversation";
+import { CreateConversation } from "@/lib/integration/client/chat-conversation";
+import { PerformanceLogger } from "@/utils/performance-logger";
 
 // Hook untuk handle conversation creation flow
 // ✅ PHASE 1: Optimized redirect pattern with improved storage and timing
 export function useConversationCreator() {
-  const router = useRouter()
-  const threadRuntime = useThreadRuntime()
-  const [isCreating, setIsCreating] = useState(false)
+  const router = useRouter();
+  const threadRuntime = useThreadRuntime();
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
-    if (!threadRuntime) return
+    if (!threadRuntime) return;
 
-    const originalSend = threadRuntime.composer.send
+    const originalSend = threadRuntime.composer.send;
 
     threadRuntime.composer.send = async () => {
       try {
-        const perf = new PerformanceLogger('NewChatFlow')
+        const perf = new PerformanceLogger("NewChatFlow");
 
-        const composerState = threadRuntime.composer.getState()
-        const message = composerState.text
-        const attachmentFile: File[] = []
+        const composerState = threadRuntime.composer.getState();
+        const message = composerState.text;
+        const attachmentFile: File[] = [];
 
         for (const attachment of composerState.attachments) {
           if (attachment.file) {
-            attachmentFile.push(attachment.file)
+            attachmentFile.push(attachment.file);
           }
         }
 
-        if (!message.trim()) return
+        if (!message.trim()) return;
 
-        setIsCreating(true)
+        setIsCreating(true);
 
         // Generate ID client-side
-        const conversationId = generateConversationId()
-        perf.checkpoint('UUID generated')
+        const conversationId = generateConversationId();
+        perf.checkpoint("UUID generated");
 
-        console.log('Creating conversation:', conversationId)
+        console.log("Creating conversation:", conversationId);
 
         // Create conversation with timeout
         const createdId = await withTimeout(
           CreateConversation(conversationId, message),
           CONVERSATION_CONSTANTS.CREATION_TIMEOUT_MS,
-          'Conversation creation timeout (30s)'
-        )
-        perf.checkpoint('Conversation created via API')
+          "Conversation creation timeout (30s)",
+        );
+        perf.checkpoint("Conversation created via API");
 
         if (!createdId) {
-          throw new Error('Failed to create conversation')
+          throw new Error("Failed to create conversation");
         }
 
-        console.log('Conversation created successfully:', createdId)
+        console.log("Conversation created successfully:", createdId);
 
         // ✅ Small delay to ensure DB write is committed before redirect
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100));
 
          // ✅ PHASE 1.4: Use smart storage instead of direct IDB
-         await savePendingMessage(message, attachmentFile)
-         perf.checkpoint('Message saved to storage')
+        await savePendingMessage(message, attachmentFile);
+        perf.checkpoint("Message saved to storage");
 
         // Redirect to conversation page
-        router.push(`/chat/${createdId}`)
-        perf.finish('NewChatFlow')
+        router.push(`/chat/${createdId}`);
+        perf.finish("NewChatFlow");
       } catch (error) {
-        console.error('Failed to create conversation:', error)
-        setIsCreating(false)
-        
-        const errorMessage = error instanceof Error ? error.message : 'Failed to create conversation'
-        alert(`${errorMessage}. Please try again.`)
+        console.error("Failed to create conversation:", error);
+        setIsCreating(false);
+
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Failed to create conversation";
+        alert(`${errorMessage}. Please try again.`);
       }
-    }
+    };
 
     return () => {
-      threadRuntime.composer.send = originalSend
-    }
-  }, [threadRuntime, router])
+      threadRuntime.composer.send = originalSend;
+    };
+  }, [threadRuntime, router]);
 
   return {
     isCreating,
-  }
+  };
 }

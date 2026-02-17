@@ -50,8 +50,8 @@ import { Reasoning, ReasoningGroup } from "@/components/assistant-ui/reasoning";
 
 const Settings = {
   attachments: true,
-  editMessages: false, // Currently we dont support editing user messages
-  regenerate: false, // Currently we dont support regenerating assistant messages
+  editMessages: true,
+  regenerate: true,
 };
 
 interface ThreadProps {

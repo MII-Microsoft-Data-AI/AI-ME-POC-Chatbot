@@ -14,6 +14,8 @@ class ConversationMetadata:
     is_pinned: bool
     title: Union[str, None]
     created_at: int  # epoch timestamp
+    repo_version: int
+    repo_ref: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -81,7 +83,9 @@ class DatabaseManager:
             "userid": userid,
             "is_pinned": False,
             "created_at": created_at,
-            "title": title 
+            "title": title,
+            "repo_version": 0,
+            "repo_ref": None,
         }
         
         container.create_item(body=document)
@@ -91,7 +95,9 @@ class DatabaseManager:
             id=conversation_id,
             userid=userid,
             is_pinned=False,
-            created_at=created_at
+            created_at=created_at,
+            repo_version=0,
+            repo_ref=None,
         )
     
     def get_conversation(self, conversation_id: str, userid: str) -> Optional[ConversationMetadata]:
@@ -109,7 +115,9 @@ class DatabaseManager:
                 userid=item['userid'],
                 is_pinned=item['is_pinned'],
                 created_at=item['created_at'],
-                title=item.get('title', None)
+                title=item.get('title', None),
+                repo_version=item.get('repo_version', 0) or 0,
+                repo_ref=item.get('repo_ref', None),
             )
         except CosmosResourceNotFoundError:
             return None
@@ -134,7 +142,9 @@ class DatabaseManager:
                 userid=item['userid'],
                 is_pinned=item['is_pinned'],
                 created_at=item['created_at'],
-                title=item.get('title', None)
+                title=item.get('title', None),
+                repo_version=item.get('repo_version', 0) or 0,
+                repo_ref=item.get('repo_ref', None),
             ))
         
         return conversations
@@ -206,6 +216,52 @@ class DatabaseManager:
             return True
         except CosmosResourceNotFoundError:
             return False
+
+    def update_conversation_repo_ref(
+        self, conversation_id: str, userid: str, repo_ref: Dict[str, Any]
+    ) -> bool:
+        """Update conversation repo pointer metadata."""
+        container = db_connection.get_conversations_container()
+
+        try:
+            item = container.read_item(
+                item=conversation_id,
+                partition_key=userid,
+            )
+
+            item["repo_ref"] = repo_ref
+
+            container.replace_item(
+                item=conversation_id,
+                body=item,
+            )
+
+            return True
+        except CosmosResourceNotFoundError:
+            return False
+
+    def bump_repo_version(self, conversation_id: str, userid: str) -> Optional[int]:
+        """Increment and return repo_version for a conversation."""
+        container = db_connection.get_conversations_container()
+
+        try:
+            item = container.read_item(
+                item=conversation_id,
+                partition_key=userid,
+            )
+
+            current_version = item.get("repo_version", 0) or 0
+            next_version = int(current_version) + 1
+            item["repo_version"] = next_version
+
+            container.replace_item(
+                item=conversation_id,
+                body=item,
+            )
+
+            return next_version
+        except CosmosResourceNotFoundError:
+            return None
     
     # File operations
     def create_file(self, file_id: str, userid: str, filename: str, blob_name: str, workflow_id: Optional[str] = None) -> FileMetadata:

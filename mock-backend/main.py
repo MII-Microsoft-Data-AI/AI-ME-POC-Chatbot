@@ -94,12 +94,26 @@ async def health():
 
 # Add external routers
 from routes.chat_conversation import chat_conversation_route
+from routes.chat import chat_routes
+from routes.thread_repo import thread_repo_routes
 from routes.file_indexing import file_indexing_route
 # from routes.image_generation import image_generation_route
 from routes.attachment import attachment_routes
 
 app.include_router(
     chat_conversation_route
+)
+
+app.include_router(
+    chat_routes,
+    prefix="/api/v1/chat",
+    tags=["chat"],
+)
+
+app.include_router(
+    thread_repo_routes,
+    prefix="/api/v1/threads",
+    tags=["thread-repo"],
 )
 
 app.include_router(

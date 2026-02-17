@@ -1,13 +1,12 @@
-import { useState, useMemo } from 'react'
-import type { ThreadHistoryAdapter } from '@assistant-ui/react'
-import { LoadConversationHistory } from '@/lib/integration/client/chat-conversation'
-import { STORAGE_KEYS } from '@/utils/chat/storage'
+import { useMemo, useState } from "react";
+import type { ThreadHistoryAdapter } from "@assistant-ui/react";
+import { LoadConversationHistory } from "@/lib/integration/client/chat-conversation";
 
 // Hook untuk load conversation history dengan error handling
 // Returns: historyAdapter (memoized), isLoadingHistory, error
 export function useConversationHistory(conversationId: string) {
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Memoize adapter supaya tidak recreate setiap render
   const historyAdapter = useMemo<ThreadHistoryAdapter>(
@@ -15,44 +14,34 @@ export function useConversationHistory(conversationId: string) {
       async load() {
         try {
           if (!conversationId) {
-            return { messages: [] }
+            return { messages: [] };
           }
 
-          // ✅ PHASE 1.1: Check if this is a new conversation redirect
-          if (typeof window !== 'undefined') {
-            const hasPendingMessage = sessionStorage.getItem(STORAGE_KEYS.PENDING_MESSAGE)
-            if (hasPendingMessage) {
-              console.log('[Optimization] Skipping history load for new conversation')
-              setIsLoadingHistory(false)
-              return { messages: [] }
-            }
-          }
-
-          setIsLoadingHistory(true)
-          setError(null)
+          setIsLoadingHistory(true);
+          setError(null);
 
           // Load conversation history dari backend
-          const historyData = await LoadConversationHistory(conversationId)
+          const historyData = await LoadConversationHistory(conversationId);
 
           if (historyData === null) {
-            setError('Failed to load conversation history')
-            setIsLoadingHistory(false)
-            return { messages: [] }
+            setError("Failed to load conversation history");
+            setIsLoadingHistory(false);
+            return { messages: [] };
           }
 
           if (historyData.length === 0) {
             // New conversation - no error, just empty
-            setIsLoadingHistory(false)
-            return { messages: [] }
+            setIsLoadingHistory(false);
+            return { messages: [] };
           }
 
-          setIsLoadingHistory(false)
-          return { messages: historyData }
+          setIsLoadingHistory(false);
+          return { messages: historyData };
         } catch (error) {
-          console.error('Failed to load conversation history:', error)
-          setError('Failed to load conversation history')
-          setIsLoadingHistory(false)
-          return { messages: [] }
+          console.error("Failed to load conversation history:", error);
+          setError("Failed to load conversation history");
+          setIsLoadingHistory(false);
+          return { messages: [] };
         }
       },
 
@@ -60,12 +49,12 @@ export function useConversationHistory(conversationId: string) {
         // Message auto-saved by backend saat streaming selesai
       },
     }),
-    [conversationId]
-  )
+    [conversationId],
+  );
 
   return {
     historyAdapter,
     isLoadingHistory,
     error,
-  }
+  };
 }
