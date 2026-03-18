@@ -1,6 +1,8 @@
 # Run orchestrator
 
 import os
+
+from py_orchestrate.decorators import workflow
 from .file_indexing import (
     index_file_v1,
     embed_chunks_v1,
@@ -11,14 +13,37 @@ from .file_indexing import (
     update_indexing_status_v1,
 )
 
-from py_orchestrate import Orchestrator
+from py_orchestrate import Orchestrator, CosmosDatabaseManager
+
+_cosmos_envs = {
+    "endpoint": os.getenv("COSMOS_ENDPOINT"),
+    "key": os.getenv("COSMOS_KEY"),
+    "database": os.getenv("COSMOS_DATABASE_NAME"),
+    "workflow_container_id": "py_orchestrate_workflow_container",
+    "activity_container_id": "py_orchestrate_activity_container_id",
+}
+
+not_present_envs = []
+for x in _cosmos_envs:
+    if _cosmos_envs[x] is None:
+        not_present_envs.append(x)
+        
+if len(not_present_envs) > 0:
+    raise ValueError(f"{",".join(not_present_envs)} env is not present")
 
 global orchestrator
 orchestrator = None
 def get_orchestrator():
     global orchestrator
     if orchestrator is None:
-        orchestrator = Orchestrator(db_path=os.getenv("DB_PATH_ORCHESTRATOR", "mock.db"))
+        db_manager = CosmosDatabaseManager(
+            endpoint=_cosmos_envs["endpoint"],
+            credential=_cosmos_envs["key"],
+            database_id=_cosmos_envs["database"],
+            workflow_container_id=_cosmos_envs["workflow_container_id"],
+            activity_container_id=_cosmos_envs["activity_container_id"],
+        )
+        orchestrator = Orchestrator(db_manager=db_manager)
 
         # Register workflows
         orchestrator.registry.register_workflow("index_file_v1", index_file_v1)
