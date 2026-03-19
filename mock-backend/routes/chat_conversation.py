@@ -8,7 +8,7 @@ from lib.auth import get_authenticated_user
 from utils.stream_protocol import generate_stream
 from utils.message_conversion import from_assistant_ui_contents_to_langgraph_contents
 
-from typing import Annotated
+from typing import Annotated, Any, cast
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -41,11 +41,14 @@ async def create_new_conversation(
 
     start = time.time()
     graph = get_graph()
+    if request is None:
+        return {"error": "Missing request body"}
 
     if not userid:
         return {"error": "Missing userid header"}
 
-    if not request.initialChat:
+    initial_chat = request.initialChat
+    if not initial_chat:
         return {"error": "Missing initialChat in request body"}
 
     print(f"  🔹 Auth check: {(time.time() - start) * 1000:.0f}ms")
@@ -60,14 +63,14 @@ async def create_new_conversation(
     print(f"  🔹 UUID gen: {(time.time() - t1) * 1000:.0f}ms")
 
     t2 = time.time()
-    db_manager.create_conversation(conversation_id, request.initialChat, userid)
+    await db_manager.create_conversation_async(conversation_id, initial_chat, userid)
     print(f"  🔹 DB create: {(time.time() - t2) * 1000:.0f}ms")
 
     print(f"  ✅ Total: {(time.time() - start) * 1000:.0f}ms")
 
     return {
         "conversationId": conversation_id,
-        "initialChat": request.initialChat,
+        "initialChat": initial_chat,
         "userId": userid,
     }
 
@@ -85,7 +88,7 @@ async def get_last_conversation_id(
         return {"error": "Missing userid header"}
 
     # Fetch the last conversation ID for the user from the database
-    last_conversation_id = db_manager.get_last_conversation_id(userid)
+    last_conversation_id = await db_manager.get_last_conversation_id_async(userid)
 
     return {"userId": userid, "lastConversationId": last_conversation_id}
 
@@ -100,7 +103,7 @@ async def get_conversations(
         return {"error": "Missing userid header"}
 
     # Fetch list of conversations for the user from the database
-    conversations = db_manager.get_user_conversations(userid)
+    conversations = await db_manager.get_user_conversations_async(userid)
 
     graph = get_graph()
 
@@ -168,7 +171,7 @@ async def get_chat_history(
     # ✅ PHASE 1.1: Don't return 404 for new conversations
     # If conversation doesn't exist yet, it's likely a new one being created
     # The frontend will skip this call anyway if pending message exists
-    if not db_manager.conversation_exists(conversation_id, userid):
+    if not await db_manager.conversation_exists_async(conversation_id, userid):
         print(
             f"[Phase1.1] Conversation {conversation_id} not found for user, returning empty history"
         )
@@ -199,7 +202,7 @@ async def chat_conversation(
     _: Annotated[str, Depends(get_authenticated_user)],
     userid: Annotated[str | None, Header()] = None,
     conversation_id: str = "",
-    request: ChatRequest = None,
+    request: ChatRequest | None = None,
 ):
     """Chat in a specific conversation. Auto-creates if doesn't exist (Phase 2.1)."""
 
@@ -210,18 +213,23 @@ async def chat_conversation(
         return {"error": "Missing request body"}
 
     # Check if the conversation exists and belongs to the user
-    if not db_manager.conversation_exists(conversation_id, userid):
+    if not await db_manager.conversation_exists_async(conversation_id, userid):
         raise HTTPException(status_code=404, detail="Conversation not found")
     if type(request.messages) is not list or len(request.messages) == 0:
         return {"error": "Invalid messages format"}
 
     last_message = request.messages[-1] if request.messages else ""
+    if not isinstance(last_message, dict) or "content" not in last_message:
+        return {"error": "Invalid message format"}
+    last_message_dict = cast(dict[str, Any], last_message)
 
     # Use LangGraph for chat
     last_message_langgraph_content = from_assistant_ui_contents_to_langgraph_contents(
-        last_message["content"]
+        last_message_dict["content"]
     )
-    input_message = [{"role": "user", "content": last_message_langgraph_content}]
+    input_message: list[HumanMessage] = [
+        HumanMessage(content=last_message_langgraph_content)
+    ]
 
     graph = get_graph()
 
@@ -250,7 +258,7 @@ async def delete_conversation(
         return {"error": "Missing userid header"}
 
     # Delete the conversation from the database
-    deleted = db_manager.delete_conversation(conversation_id, userid)
+    deleted = await db_manager.delete_conversation_async(conversation_id, userid)
 
     if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -269,12 +277,12 @@ async def pin_conversation(
     if not userid:
         return {"error": "Missing userid header"}
 
-    existing_data = db_manager.get_conversation(conversation_id, userid)
+    existing_data = await db_manager.get_conversation_async(conversation_id, userid)
     if not existing_data:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Pin or unpin the conversation in the database
-    updated = db_manager.pin_conversation(
+    updated = await db_manager.pin_conversation_async(
         conversation_id, userid, not existing_data.is_pinned
     )
 
@@ -305,12 +313,14 @@ async def rename_conversation(
     if not new_title:
         return {"error": "Missing new_title in request body"}
 
-    existing_data = db_manager.get_conversation(conversation_id, userid)
+    existing_data = await db_manager.get_conversation_async(conversation_id, userid)
     if not existing_data:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Rename the conversation in the database
-    updated = db_manager.rename_conversation(conversation_id, userid, new_title)
+    updated = await db_manager.rename_conversation_async(
+        conversation_id, userid, new_title
+    )
 
     if not updated:
         raise HTTPException(status_code=404, detail="Conversation not found")

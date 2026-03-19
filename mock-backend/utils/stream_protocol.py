@@ -5,7 +5,7 @@ import json
 import re
 import typing
 import uuid
-from typing import List
+from typing import List, Sequence
 
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, ToolMessage
 from langgraph.graph.state import CompiledStateGraph
@@ -148,7 +148,9 @@ def handle_ai_message(
 
 
 async def generate_stream(
-    graph: CompiledStateGraph, input_message: List[HumanMessage], conversation_id: str
+    graph: CompiledStateGraph,
+    input_message: Sequence[HumanMessage],
+    conversation_id: str,
 ):
     # Generate unique message ID
     message_id = str(uuid.uuid4())

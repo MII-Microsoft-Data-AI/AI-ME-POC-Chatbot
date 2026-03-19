@@ -205,7 +205,7 @@ if (
 
             # Get semantic configuration from env or use default
             semantic_config = os.getenv(
-                "AZURE_SEARCH_SEMANTIC_CONFIG", "my-semantic-config"
+                "AZURE_SEARCH_SEMANTIC_CONFIG", "main-semantic-config"
             )
             print(
                 f"🔍 Semantic search: query='{query}', top={top}, config='{semantic_config}'"

@@ -1,11 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { FileMetadata, FileIndexingAPI } from '@/lib/integration/client/file-indexing'
-import { formatUploadTime, getFileIcon } from '@/utils/file-utils'
-import GenericConfirmationModal from './GenericConfirmationModal'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import GenericConfirmationModal from './GenericConfirmationModal'
+import { FileIndexingAPI, FileMetadata, getStatusColor, getStatusText } from '@/lib/integration/client/file-indexing'
+import { formatUploadTime, getFileIcon } from '@/utils/file-utils'
 
 interface FileListProps {
   files: FileMetadata[]
@@ -16,7 +15,7 @@ interface FileListProps {
 export default function FileList({ files, onFileDeleted, onFileReindexed }: FileListProps) {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [fileToDelete, setFileToDelete] = useState<FileMetadata | null>(null)
-  const [loadingStates, setLoadingStates] = useState<{ [key: string]: 'deleting' | 'reindexing' | null }>({})
+  const [loadingStates, setLoadingStates] = useState<Record<string, 'deleting' | 'reindexing' | null>>({})
 
   const handleDeleteClick = (file: FileMetadata) => {
     setFileToDelete(file)
@@ -27,7 +26,7 @@ export default function FileList({ files, onFileDeleted, onFileReindexed }: File
     if (!fileToDelete) return
 
     setLoadingStates(prev => ({ ...prev, [fileToDelete.file_id]: 'deleting' }))
-    
+
     try {
       await FileIndexingAPI.deleteFile(fileToDelete.file_id)
       onFileDeleted()
@@ -41,11 +40,22 @@ export default function FileList({ files, onFileDeleted, onFileReindexed }: File
     }
   }
 
-  /* eslint-disable @typescript-eslint/no-unused-vars */
   const handleReindex = async (file: FileMetadata) => {
-    // Reindex functionality implementation if needed in future
-    // Currently UI doesn't explicitly show this button in the table design but keeping function handy
+    setLoadingStates(prev => ({ ...prev, [file.file_id]: 'reindexing' }))
+
+    try {
+      await FileIndexingAPI.reindexFile(file.file_id)
+      onFileReindexed()
+    } catch (error) {
+      console.error('Reindex failed:', error)
+      alert(`Reindex failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setLoadingStates(prev => ({ ...prev, [file.file_id]: null }))
+    }
   }
+
+  const canReindex = (status: FileMetadata['status']) => status === 'completed' || status === 'failed'
+  const canDelete = (status: FileMetadata['status']) => status !== 'pending' && status !== 'in_progress'
 
   if (files.length === 0) {
     return (
@@ -58,4 +68,105 @@ export default function FileList({ files, onFileDeleted, onFileReindexed }: File
     )
   }
 
+  return (
+    <>
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">File</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Uploaded</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 bg-white">
+              {files.map((file) => {
+                const loadingState = loadingStates[file.file_id]
+                const isDeleting = loadingState === 'deleting'
+                const isReindexing = loadingState === 'reindexing'
+                const isBusy = isDeleting || isReindexing
+                const processing = file.status === 'pending' || file.status === 'in_progress'
+                const reindexAllowed = canReindex(file.status)
+                const deleteAllowed = canDelete(file.status)
+
+                return (
+                  <tr key={file.file_id} className="hover:bg-slate-50/70">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-lg">
+                          {getFileIcon(file.filename)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-900">{file.filename}</p>
+                          <p className="truncate text-xs text-slate-500">{file.blob_name}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusColor(file.status)}`}>
+                        {getStatusText(file.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{formatUploadTime(file.uploaded_at)}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant={reindexAllowed ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => handleReindex(file)}
+                          disabled={isBusy || !reindexAllowed}
+                          title={
+                            isReindexing
+                              ? 'Reindexing in progress'
+                              : reindexAllowed
+                                ? 'Reindex this file'
+                                : processing
+                                  ? 'Available after indexing finishes'
+                                  : 'Reindex this file'
+                          }
+                        >
+                          {isReindexing ? 'Reindexing...' : 'Reindex'}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteClick(file)}
+                          disabled={isBusy || !deleteAllowed}
+                          title={
+                            isDeleting
+                              ? 'Deleting in progress'
+                              : deleteAllowed
+                                ? 'Delete this file'
+                                : 'Unavailable while indexing is in progress'
+                          }
+                        >
+                          {isDeleting ? 'Deleting...' : 'Delete'}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <GenericConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false)
+          setFileToDelete(null)
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Delete file?"
+        message={`This will permanently remove ${fileToDelete?.filename ?? 'this file'} from your resources.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
+    </>
+  )
 }

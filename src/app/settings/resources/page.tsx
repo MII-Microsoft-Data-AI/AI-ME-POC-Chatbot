@@ -16,6 +16,7 @@ export default function ResourcesPage() {
   const [filesLoading, setFilesLoading] = useState(false)
   const [filesError, setFilesError] = useState<string | null>(null)
   const [filterType, setFilterType] = useState<'all' | 'yours' | 'shared'>('all')
+  const filterOptions: Array<'all' | 'yours' | 'shared'> = ['all', 'yours', 'shared']
 
   const fetchFiles = async () => {
     try {
@@ -52,7 +53,7 @@ export default function ResourcesPage() {
       fetchFiles()
     }, 10000)
     return () => clearInterval(interval)
-  }, [files])
+  }, [])
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -124,10 +125,10 @@ export default function ResourcesPage() {
             {/* Filters (View all / Your files / Shared files) */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="inline-flex gap-1 bg-slate-100 p-1 rounded-lg self-start">
-                  {['all', 'yours', 'shared'].map((type) => (
+                  {filterOptions.map((type) => (
                     <button
                       key={type}
-                      onClick={() => setFilterType(type as any)}
+                      onClick={() => setFilterType(type)}
                       className={cn(
                         "relative px-3 py-1.5 text-sm font-medium rounded-md transition-colors z-10",
                         filterType === type ? "text-slate-900" : "text-slate-500 hover:text-slate-900"
