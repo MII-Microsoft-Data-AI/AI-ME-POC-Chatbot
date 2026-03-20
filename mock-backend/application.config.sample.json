@@ -1,0 +1,15 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8000
+  },
+  "auth": {
+    "username": "apiuser",
+    "password": "securepass123"
+  },
+  "cosmos": {
+    "endpoint": "https://your-cosmos-account.documents.azure.com:443/",
+    "key": "your-cosmos-key",
+    "database_name": "chatbot_db"
+  }
+}

@@ -6,16 +6,27 @@ from typing import Any, Optional
 
 from azure.cosmos import CosmosClient, PartitionKey
 
+from lib.application_config import (
+    get_application_config,
+    get_required_application_config_value,
+)
+
 
 class CosmosDBConnection:
     """Cosmos DB connection manager."""
 
     def __init__(self):
-        import os
+        application_config = get_application_config()
 
-        self.endpoint = os.getenv("COSMOS_ENDPOINT")
-        self.key = os.getenv("COSMOS_KEY")
-        self.database_name = os.getenv("COSMOS_DATABASE_NAME", "chatbot-db")
+        self.endpoint = get_required_application_config_value(
+            application_config, "cosmos.endpoint"
+        )
+        self.key = get_required_application_config_value(
+            application_config, "cosmos.key"
+        )
+        self.database_name = get_required_application_config_value(
+            application_config, "cosmos.database_name"
+        )
 
         self.conversations_container = "conversations"
         self.files_container = "files"
@@ -37,9 +48,7 @@ class CosmosDBConnection:
                 return
 
             if not self.endpoint or not self.key:
-                raise ValueError(
-                    "COSMOS_ENDPOINT and COSMOS_KEY must be set in environment variables"
-                )
+                raise ValueError("cosmos.endpoint and cosmos.key must be configured")
 
             self._client = CosmosClient(self.endpoint, credential=self.key)
             self._database = self._client.create_database_if_not_exists(

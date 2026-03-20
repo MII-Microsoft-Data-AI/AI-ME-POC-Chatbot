@@ -2,16 +2,18 @@
 A workflow to index and chunk a file using Azure services.
 """
 
+import base64
+import binascii
+import json
 import os
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, NoReturn
 from py_orchestrate import activity, workflow
 from azure.storage.blob import BlobServiceClient
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.search.documents.indexes import SearchIndexClient
-from azure.search.documents.models import VectorizedQuery
 from azure.search.documents.indexes.models import (
     SearchIndex,
     SearchField,
@@ -25,11 +27,9 @@ from azure.search.documents.indexes.models import (
     SemanticField,
     SearchableField,
     SimpleField,
-    AzureOpenAIVectorizer,
-    AzureOpenAIVectorizerParameters,
 )
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest, AnalyzeResult
-from openai import AzureOpenAI
+from openai import OpenAI
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from lib.database import db_manager
 
@@ -37,47 +37,132 @@ from lib.database import db_manager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+_INDEXING_CONFIG_CACHE: Optional[Dict[str, Any]] = None
 
-def require_env(name: str) -> str:
+
+def _require_raw_env(name: str) -> str:
     value = os.getenv(name)
-    if value is None:
+    if not value:
         raise ValueError(f"Missing required environment variable: {name}")
     return value
 
 
-# Azure clients initialization
+def _get_config_value(config: Dict[str, Any], path: str) -> Any:
+    current: Any = config
+    for part in path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            raise ValueError(f"Missing required config value: {path}")
+        current = current[part]
+    return current
+
+
+def _get_required_config_value(config: Dict[str, Any], path: str) -> str:
+    value = _get_config_value(config, path)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"Config value {path} must be a non-empty string")
+    return value.strip()
+
+
+def _normalize_openai_base_url(path: str, value: str) -> str:
+    normalized = value.strip().rstrip("/")
+    if not normalized.endswith("/v1"):
+        raise ValueError(f"Config value {path} must end with /v1")
+    return normalized
+
+
+def _load_indexing_config() -> Dict[str, Any]:
+    global _INDEXING_CONFIG_CACHE
+    if _INDEXING_CONFIG_CACHE is not None:
+        return _INDEXING_CONFIG_CACHE
+
+    raw_config = _require_raw_env("INDEXING_CONFIG_JSON_BASE64")
+    try:
+        decoded_config = base64.b64decode(raw_config, validate=True).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError, ValueError) as exc:
+        raise ValueError("Invalid base64 in INDEXING_CONFIG_JSON_BASE64") from exc
+
+    try:
+        config = json.loads(decoded_config)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Invalid JSON in INDEXING_CONFIG_JSON_BASE64") from exc
+
+    if not isinstance(config, dict):
+        raise ValueError("INDEXING_CONFIG_JSON_BASE64 must decode to a JSON object")
+
+    required_paths = [
+        "storage.connection_string",
+        "storage.container_name",
+        "document_intelligence.endpoint",
+        "document_intelligence.api_key",
+        "llm_openai.base_url",
+        "llm_openai.api_key",
+        "llm_openai.model_id",
+        "embedding_openai.base_url",
+        "embedding_openai.api_key",
+        "embedding_openai.model_id",
+        "search.endpoint",
+        "search.api_key",
+        "search.index_name",
+    ]
+
+    for path in required_paths:
+        _get_required_config_value(config, path)
+
+    _normalize_openai_base_url(
+        "llm_openai.base_url",
+        _get_required_config_value(config, "llm_openai.base_url"),
+    )
+    _normalize_openai_base_url(
+        "embedding_openai.base_url",
+        _get_required_config_value(config, "embedding_openai.base_url"),
+    )
+
+    _INDEXING_CONFIG_CACHE = config
+    return config
+
+
+def _get_indexing_config() -> Dict[str, Any]:
+    return _load_indexing_config()
+
+
+# Client initialization
 def get_azure_clients():
-    """Initialize Azure service clients."""
+    """Initialize service clients for indexing."""
+    config = _get_indexing_config()
+
     # Blob Storage
     blob_service = BlobServiceClient.from_connection_string(
-        require_env("AZURE_STORAGE_CONNECTION_STRING")
+        _get_required_config_value(config, "storage.connection_string")
     )
 
     # Document Intelligence
     doc_intelligence = DocumentIntelligenceClient(
-        endpoint=require_env("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"),
+        endpoint=_get_required_config_value(config, "document_intelligence.endpoint"),
         credential=AzureKeyCredential(
-            require_env("AZURE_DOCUMENT_INTELLIGENCE_API_KEY")
+            _get_required_config_value(config, "document_intelligence.api_key")
         ),
     )
 
-    # Azure OpenAI
-    openai_client = AzureOpenAI(
-        azure_endpoint=require_env("AZURE_OPENAI_ENDPOINT"),
-        api_key=require_env("AZURE_OPENAI_API_KEY"),
-        api_version=require_env("AZURE_OPENAI_API_VERSION"),
+    # OpenAI-compatible embeddings client
+    openai_client = OpenAI(
+        base_url=_get_required_config_value(config, "embedding_openai.base_url"),
+        api_key=_get_required_config_value(config, "embedding_openai.api_key"),
     )
 
     # Azure AI Search
     search_client = SearchClient(
-        endpoint=require_env("AZURE_SEARCH_ENDPOINT"),
-        index_name=require_env("AZURE_SEARCH_INDEX_NAME"),
-        credential=AzureKeyCredential(require_env("AZURE_SEARCH_API_KEY")),
+        endpoint=_get_required_config_value(config, "search.endpoint"),
+        index_name=_get_required_config_value(config, "search.index_name"),
+        credential=AzureKeyCredential(
+            _get_required_config_value(config, "search.api_key")
+        ),
     )
 
     search_index_client = SearchIndexClient(
-        endpoint=require_env("AZURE_SEARCH_ENDPOINT"),
-        credential=AzureKeyCredential(require_env("AZURE_SEARCH_API_KEY")),
+        endpoint=_get_required_config_value(config, "search.endpoint"),
+        credential=AzureKeyCredential(
+            _get_required_config_value(config, "search.api_key")
+        ),
     )
 
     return (
@@ -94,7 +179,9 @@ def ensure_search_index_v1() -> bool:
     """Ensure the Azure AI Search index exists with proper schema."""
     try:
         _, _, _, _, search_index_client = get_azure_clients()
-        index_name = require_env("AZURE_SEARCH_INDEX_NAME")
+        index_name = _get_required_config_value(
+            _get_indexing_config(), "search.index_name"
+        )
 
         # Check if index exists
         try:
@@ -126,7 +213,7 @@ def ensure_search_index_v1() -> bool:
                 name="content_vector",
                 type=SearchFieldDataType.Collection(SearchFieldDataType.Single),
                 searchable=True,
-                vector_search_dimensions=1536,  # Ada-002 embedding dimension
+                vector_search_dimensions=1536,  # Embedding model dimension
                 vector_search_profile_name="main-vector-config",
             ),
         ]
@@ -210,7 +297,7 @@ def extract_markdown_from_result(result: AnalyzeResult) -> str:
     return "\n\n".join(markdown_parts)
 
 
-def fail_indexing_workflow(file_id: str, userid: str, message: str) -> None:
+def fail_indexing_workflow(file_id: str, userid: str, message: str) -> NoReturn:
     """Persist a failed indexing status and raise an exception."""
     update_indexing_status_v1(file_id, userid, "failed", message)
     raise RuntimeError(message)
@@ -228,7 +315,9 @@ def ocr_file_v1(file_id: str, userid: str) -> str:
             raise ValueError(f"File {file_id} not found in database")
 
         # Download file from blob storage
-        container_name = require_env("AZURE_STORAGE_CONTAINER_NAME")
+        container_name = _get_required_config_value(
+            _get_indexing_config(), "storage.container_name"
+        )
         blob_client = blob_service.get_blob_client(
             container=container_name, blob=file_metadata.blob_name
         )
@@ -283,7 +372,7 @@ def chunk_file_v1(content: str) -> List[str]:
 def embed_chunks_v1(
     chunks: List[str], file_id: str, userid: str
 ) -> List[Dict[str, Any]]:
-    """Generate embeddings for chunks using Azure OpenAI."""
+    """Generate embeddings for chunks using OpenAI."""
     try:
         _, _, openai_client, _, _ = get_azure_clients()
 
@@ -293,13 +382,13 @@ def embed_chunks_v1(
             raise ValueError(f"File {file_id} not found in database")
 
         embeddings = []
-        deployment_name = require_env("AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME")
+        model_id = _get_required_config_value(
+            _get_indexing_config(), "embedding_openai.model_id"
+        )
 
         for i, chunk in enumerate(chunks):
             # Generate embedding
-            response = openai_client.embeddings.create(
-                input=chunk, model=deployment_name
-            )
+            response = openai_client.embeddings.create(input=chunk, model=model_id)
 
             embedding_vector = response.data[0].embedding
 
@@ -400,6 +489,7 @@ def index_file_v1(file_id: str, userid: str) -> bool:
             return True
 
         fail_indexing_workflow(file_id, userid, "Failed to store embeddings")
+        return False
 
     except Exception as e:
         error_message = str(e)

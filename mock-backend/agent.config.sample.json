@@ -1,0 +1,63 @@
+{
+  "llm": {
+    "base_url": "https://your-provider.example.com/openai/v1",
+    "api_key": "your-api-key",
+    "model_id": "gpt-4.1-mini",
+    "verify_ssl": true
+  },
+  "prompty": {
+    "enabled": true,
+    "base_url": "https://your-prompty-service.example.com",
+    "project_id": "your-project-id",
+    "api_key": "your-prompty-api-key"
+  },
+  "tools": {
+    "searxng": {
+      "enabled": true,
+      "base_url": "https://your-searxng-instance.example.com"
+    },
+    "azure_session_pool": {
+      "enabled": false,
+      "endpoint": ""
+    },
+    "ai_search": {
+      "enabled": true,
+      "endpoint": "https://your-search.search.windows.net",
+      "api_key": "your-search-api-key",
+      "index_name": "your-index-name",
+      "semantic_config": "main-semantic-config",
+      "vector_field": "content_vector",
+      "openai_embedding": {
+        "enabled": true,
+        "base_url": "https://your-provider.example.com/openai/v1",
+        "api_key": "your-api-key",
+        "model_id": "text-embedding-3-small"
+      }
+    },
+    "generate_image": {
+      "enabled": true,
+      "provider": "dalle",
+      "storage": {
+        "connection_string": "your-storage-connection-string",
+        "container_name": "your-container-name"
+      },
+      "dalle": {
+        "base_url": "https://your-provider.example.com/openai/v1",
+        "api_key": "your-api-key",
+        "model_id": "dall-e-3"
+      },
+      "flux": {
+        "endpoint": "https://your-foundry-endpoint/providers/blackforestlabs/v1",
+        "api_key": "your-api-key",
+        "model_id": "flux-2-pro",
+        "api_version": "preview"
+      },
+      "gpt_image": {
+        "endpoint": "https://your-cognitiveservices-endpoint/openai/deployments/gpt-image-1.5/images/generations",
+        "api_key": "your-api-key",
+        "api_version": "2024-02-01",
+        "model_id": "gpt-image-1.5"
+      }
+    }
+  }
+}

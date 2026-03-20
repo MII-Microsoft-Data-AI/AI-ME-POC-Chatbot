@@ -61,12 +61,12 @@ A modern ChatGPT-like application built with Next.js, featuring unified chat and
    **Backend (mock-backend/.env):**
 
    ```env
-   AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-   AZURE_OPENAI_API_KEY=your-api-key
-   AZURE_OPENAI_API_VERSION=2025-01-01-preview
-   AZURE_OPENAI_DALLE_DEPLOYMENT_NAME=dall-e-3
-   AZURE_OPENAI_GPT_DEPLOYMENT_NAME=gpt-4
+   APPLICATION_CONFIG_JSON_BASE64=<base64-encoded-application-json>
+   AGENT_CONFIG_JSON_BASE64=<base64-encoded-agent-json>
+   INDEXING_CONFIG_JSON_BASE64=<base64-encoded-indexing-json>
    ```
+
+   Use `mock-backend/application.config.sample.json`, `mock-backend/agent.config.sample.json`, and `mock-backend/indexing.config.sample.json` as the decoded JSON templates, then base64-encode them into the environment variables above. The backend README at `mock-backend/README.md` documents the expected schemas.
 
 4. **Start the application:**
 

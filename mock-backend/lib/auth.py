@@ -1,6 +1,5 @@
 """Authentication utilities for the FastAPI server."""
 
-import os
 import secrets
 from typing import Annotated
 
@@ -8,15 +7,25 @@ from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
+from lib.application_config import (
+    get_application_config,
+    get_required_application_config_value,
+)
+
 # Load environment variables
 load_dotenv()
 
 # Initialize HTTP Basic Auth
 security = HTTPBasic(auto_error=False)
 
-# Get credentials from environment
-BACKEND_AUTH_USERNAME = os.getenv("BACKEND_AUTH_USERNAME", "apiuser")
-BACKEND_AUTH_PASSWORD = os.getenv("BACKEND_AUTH_PASSWORD", "securepass123")
+# Get credentials from application config
+application_config = get_application_config()
+BACKEND_AUTH_USERNAME = get_required_application_config_value(
+    application_config, "auth.username"
+)
+BACKEND_AUTH_PASSWORD = get_required_application_config_value(
+    application_config, "auth.password"
+)
 
 
 def verify_credentials(

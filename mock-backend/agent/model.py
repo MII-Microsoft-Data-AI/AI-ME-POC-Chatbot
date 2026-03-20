@@ -1,11 +1,12 @@
-"""Model configuration for Azure OpenAI integration."""
-
-import os
+"""Model configuration for OpenAI-compatible agent integration."""
 
 import httpx
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
+from typing import cast
+
+from .config import get_agent_config, get_bool_config_value, get_required_config_value
 
 # Load environment variables
 load_dotenv()
@@ -47,15 +48,16 @@ def create_openai_model(verify_ssl: bool = True, **kwargs) -> ChatOpenAI:
         ChatOpenAI: Configured OpenAI model
     """
 
-    base_url = f"{os.getenv('AZURE_OPENAI_ENDPOINT')}/openai/v1"
-    # Add /openai/v1 for Azure Deployment
-    if os.getenv("USE_OPENAI_CLIENT", "false") == "true":
-        base_url = os.getenv("AZURE_OPENAI_ENDPOINT")
+    config = get_agent_config()
+    base_url: str = cast(str, get_required_config_value(config, "llm.base_url"))
+    model_id: str = cast(str, get_required_config_value(config, "llm.model_id"))
+    api_key: str = cast(str, get_required_config_value(config, "llm.api_key"))
+    verify_ssl = get_bool_config_value(config, "llm.verify_ssl", verify_ssl)
 
     return ChatOpenAI(
         base_url=base_url,
-        model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", ""),
-        api_key=SecretStr(os.getenv("AZURE_OPENAI_API_KEY", "")),
+        model=model_id,
+        api_key=SecretStr(api_key),
         # temperature=0.5,
         streaming=True,
         http_client=_create_http_client(verify_ssl=verify_ssl),
@@ -63,7 +65,6 @@ def create_openai_model(verify_ssl: bool = True, **kwargs) -> ChatOpenAI:
     )
 
 
-# Default model instance
-# To connect to unverified SSL certificates, set VERIFY_SSL=false in environment
-verify_ssl = os.getenv("VERIFY_SSL", "true").lower() == "true"
+config = get_agent_config()
+verify_ssl = get_bool_config_value(config, "llm.verify_ssl", True)
 model = create_openai_model(verify_ssl=verify_ssl)

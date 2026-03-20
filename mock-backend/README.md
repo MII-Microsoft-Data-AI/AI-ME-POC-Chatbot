@@ -53,18 +53,10 @@ A real-time AI inference API built with FastAPI, LangGraph, and Azure OpenAI, su
 4. **Edit `.env` with your credentials:**
 
    ```env
-   # Azure OpenAI - Chat
-   AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-   AZURE_OPENAI_API_KEY=your-api-key
-   AZURE_OPENAI_API_VERSION=2025-01-01-preview
-   AZURE_OPENAI_GPT_DEPLOYMENT_NAME=gpt-4
-   
-   # Azure OpenAI - Image Generation
-   AZURE_OPENAI_DALLE_DEPLOYMENT_NAME=dall-e-3
-   
-   # Authentication
-   BACKEND_AUTH_USERNAME=apiuser
-   BACKEND_AUTH_PASSWORD=securepass123
+   # Base64-encoded JSON configs
+   APPLICATION_CONFIG_JSON_BASE64=<base64-encoded-application-json>
+   AGENT_CONFIG_JSON_BASE64=<base64-encoded-agent-json>
+   INDEXING_CONFIG_JSON_BASE64=<base64-encoded-indexing-json>
    ```
 
 5. **Start the server:**
@@ -74,6 +66,159 @@ A real-time AI inference API built with FastAPI, LangGraph, and Azure OpenAI, su
    ```
 
 Server will be available at `http://localhost:8000`
+
+## JSON Config Environment Variables
+
+The backend now uses three base64-encoded JSON environment variables for application, agent, and indexing configuration.
+
+### `APPLICATION_CONFIG_JSON_BASE64`
+
+- Used by `mock-backend/main.py`, `mock-backend/lib/auth.py`, `mock-backend/lib/db_connection.py`, `mock-backend/lib/checkpointer.py`, and `mock-backend/orchestration/__init__.py`
+- Sample decoded JSON lives in `mock-backend/application.config.sample.json`
+- The application config contains server settings, HTTP Basic Auth, and Cosmos DB settings shared by the API, checkpointer, and orchestrator
+
+Expected decoded shape:
+
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8000
+  },
+  "auth": {
+    "username": "apiuser",
+    "password": "securepass123"
+  },
+  "cosmos": {
+    "endpoint": "https://your-cosmos-account.documents.azure.com:443/",
+    "key": "your-cosmos-key",
+    "database_name": "chatbot_db"
+  }
+}
+```
+
+### `AGENT_CONFIG_JSON_BASE64`
+
+- Used by `mock-backend/agent/model.py`, `mock-backend/agent/prompt.py`, and `mock-backend/agent/tools.py`
+- Sample decoded JSON lives in `mock-backend/agent.config.sample.json`
+- The agent config contains the chat model, optional Prompty settings, and tool configuration such as SearxNG, AI Search, and `tools.generate_image`
+
+Expected decoded shape:
+
+```json
+{
+  "llm": {
+    "base_url": "https://your-provider.example.com/openai/v1",
+    "api_key": "your-api-key",
+    "model_id": "gpt-4.1-mini",
+    "verify_ssl": true
+  },
+  "prompty": {
+    "enabled": true,
+    "base_url": "https://your-prompty-service.example.com",
+    "project_id": "your-project-id",
+    "api_key": "your-prompty-api-key"
+  },
+  "tools": {
+    "searxng": {
+      "enabled": true,
+      "base_url": "https://your-searxng-instance.example.com"
+    },
+    "azure_session_pool": {
+      "enabled": false,
+      "endpoint": ""
+    },
+    "ai_search": {
+      "enabled": true,
+      "endpoint": "https://your-search.search.windows.net",
+      "api_key": "your-search-api-key",
+      "index_name": "your-index-name",
+      "semantic_config": "main-semantic-config",
+      "vector_field": "content_vector",
+      "openai_embedding": {
+        "enabled": true,
+        "base_url": "https://your-provider.example.com/openai/v1",
+        "api_key": "your-api-key",
+        "model_id": "text-embedding-3-small"
+      }
+    },
+    "generate_image": {
+      "enabled": true,
+      "provider": "dalle",
+      "storage": {
+        "connection_string": "your-storage-connection-string",
+        "container_name": "your-container-name"
+      },
+      "dalle": {
+        "base_url": "https://your-provider.example.com/openai/v1",
+        "api_key": "your-api-key",
+        "model_id": "dall-e-3"
+      }
+    }
+  }
+}
+```
+
+### `INDEXING_CONFIG_JSON_BASE64`
+
+- Used by `mock-backend/orchestration/file_indexing.py`
+- Sample decoded JSON lives in `mock-backend/indexing.config.sample.json`
+- The indexing workflow reads storage, document intelligence, search, and OpenAI-compatible embedding settings directly from this JSON
+
+Expected decoded shape:
+
+```json
+{
+  "storage": {
+    "connection_string": "your-storage-connection-string",
+    "container_name": "your-container-name"
+  },
+  "document_intelligence": {
+    "endpoint": "https://your-resource.cognitiveservices.azure.com/",
+    "api_key": "your-document-intelligence-api-key"
+  },
+  "llm_openai": {
+    "base_url": "https://your-provider.example.com/openai/v1",
+    "api_key": "your-api-key",
+    "model_id": "gpt-4.1-mini"
+  },
+  "embedding_openai": {
+    "base_url": "https://your-provider.example.com/openai/v1",
+    "api_key": "your-api-key",
+    "model_id": "text-embedding-3-small"
+  },
+  "search": {
+    "endpoint": "https://your-search.search.windows.net",
+    "api_key": "your-search-api-key",
+    "index_name": "your-index-name"
+  }
+}
+```
+
+Notes:
+
+- `llm.base_url`, `tools.ai_search.openai_embedding.base_url`, `tools.generate_image.dalle.base_url`, `llm_openai.base_url`, and `embedding_openai.base_url` must already include `/v1`
+- The indexing workflow currently assumes an embedding model compatible with the index vector dimension
+- Feature blocks under `prompty` and `tools.*` are enabled or disabled with their `enabled` flags
+
+### Encode JSON to Base64
+
+From `mock-backend/`, you can generate the environment variable values with Python:
+
+```bash
+python - <<'PY'
+import base64
+from pathlib import Path
+
+for filename in [
+    "application.config.sample.json",
+    "agent.config.sample.json",
+    "indexing.config.sample.json",
+]:
+    encoded = base64.b64encode(Path(filename).read_bytes()).decode("utf-8")
+    print(f"{filename}:\n{encoded}\n")
+PY
+```
 
 ## 📖 Unified Chat & Image Generation
 
@@ -303,9 +448,14 @@ mock-backend/
 │   ├── chat_conversation.py     # Chat & image endpoints
 │   └── file_indexing.py         # File processing
 ├── agent/
+│   ├── config.py                # Agent JSON config loader
 │   ├── graph.py                 # LangGraph agent
-│   ├── model.py                 # Azure OpenAI config
+│   ├── model.py                 # Agent model config
+│   ├── prompt.py                # Prompt + Prompty client
 │   └── tools.py                 # Agent tools
+├── application.config.sample.json # Decoded application config example
+├── agent.config.sample.json     # Decoded agent config example
+├── indexing.config.sample.json  # Decoded indexing config example
 ├── utils/
 │   ├── stream_protocol.py       # Streaming utilities
 │   └── uuid.py                  # UUID generation
@@ -483,12 +633,9 @@ CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 Production `.env`:
 
 ```env
-AZURE_OPENAI_ENDPOINT=https://prod-resource.openai.azure.com/
-AZURE_OPENAI_API_KEY=prod-api-key
-AZURE_OPENAI_GPT_DEPLOYMENT_NAME=gpt-4
-AZURE_OPENAI_DALLE_DEPLOYMENT_NAME=dall-e-3
-BACKEND_AUTH_USERNAME=secure-username
-BACKEND_AUTH_PASSWORD=secure-password
+APPLICATION_CONFIG_JSON_BASE64=<base64-encoded-application-json>
+AGENT_CONFIG_JSON_BASE64=<base64-encoded-agent-json>
+INDEXING_CONFIG_JSON_BASE64=<base64-encoded-indexing-json>
 ```
 
 ## 📝 License

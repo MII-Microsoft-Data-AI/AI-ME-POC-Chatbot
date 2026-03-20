@@ -3,30 +3,21 @@
 This module provides various tools that can be used by the LangGraph agent:
 
 1. get_current_time: Get current date and time
-2. SessionsPythonREPLTool: Execute Python code (requires AZURE_SESSIONPOOL_ENDPOINT)
-3. web_search: Perform web search using SearxNG (requires SEARXNG_URL)
-4. Azure AI Search tools (require AZURE_SEARCH_* environment variables):
+2. SessionsPythonREPLTool: Execute Python code when enabled in config
+3. web_search: Perform web search using SearxNG when enabled in config
+4. Azure AI Search tools (configured via AGENT_CONFIG_JSON_BASE64):
    - azure_search_documents: Text-based search
    - azure_search_semantic: Semantic search with AI ranking
    - azure_search_filter: Search with OData filters
-   - azure_search_vector: Vector similarity search (requires Azure OpenAI)
+   - azure_search_vector: Vector similarity search (requires OpenAI-compatible embeddings)
 
-Environment Variables Required:
-- AZURE_SEARCH_ENDPOINT: Your Azure AI Search service endpoint
-- AZURE_SEARCH_KEY: Your Azure AI Search admin key
-- AZURE_SEARCH_INDEX_NAME: The search index to query
-- AZURE_SEARCH_SEMANTIC_CONFIG: Semantic configuration name (optional, defaults to 'default')
-- AZURE_SEARCH_VECTOR_FIELD: Vector field name (optional, defaults to 'content_vector')
-- AZURE_OPENAI_ENDPOINT: Azure OpenAI endpoint (for vector search)
-- AZURE_OPENAI_KEY: Azure OpenAI key (for vector search)
-- AZURE_OPENAI_EMBEDDING_MODEL: Embedding model name (optional, defaults to 'text-embedding-ada-002')
 """
 
 import base64
 import os
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Any, Literal, Optional, cast
 
 import requests
 from azure.core.credentials import AzureKeyCredential
@@ -37,11 +28,52 @@ from dotenv import load_dotenv
 from langchain_azure_dynamic_sessions import SessionsPythonREPLTool
 from langchain_community.utilities import SearxSearchWrapper
 from langchain_core.tools import tool
-from openai import AzureOpenAI
+from openai import OpenAI
 from pydantic import BaseModel, Field
+
+from .config import (
+    get_agent_config,
+    get_bool_config_value,
+    get_config_value,
+    get_required_config_value,
+)
 
 # Load environment variables from .env file if present
 load_dotenv()
+
+AGENT_CONFIG = get_agent_config()
+
+
+def _tool_enabled(path: str) -> bool:
+    return get_bool_config_value(AGENT_CONFIG, path, False)
+
+
+def _tool_value(path: str, default=None):
+    return get_config_value(AGENT_CONFIG, path, default)
+
+
+def _tool_str(path: str) -> str:
+    return cast(str, get_required_config_value(AGENT_CONFIG, path))
+
+
+def _decode_base64_image(data: Any, source: str) -> bytes:
+    if not isinstance(data, str) or not data:
+        raise ValueError(f"Missing base64 image data from {source}")
+    return base64.b64decode(data)
+
+
+ImageSize = Literal[
+    "1024x1024",
+    "1536x1024",
+    "1024x1536",
+    "256x256",
+    "512x512",
+    "1792x1024",
+    "1024x1792",
+    "auto",
+]
+
+ImageStyle = Literal["vivid", "natural"]
 
 
 # Pydantic models for tool arguments
@@ -75,19 +107,19 @@ class AzureSearchFilterInput(BaseModel):
 tool_generator = []
 
 
-# Initialize Azure OpenAI client for DALL-E
+# Initialize OpenAI-compatible client for DALL-E
 def get_dalle_client():
-    return AzureOpenAI(
-        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2025-01-01-preview"),
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-    )
+    base_url = _tool_str("tools.generate_image.dalle.base_url")
+    api_key = _tool_str("tools.generate_image.dalle.api_key")
+    assert isinstance(base_url, str)
+    assert isinstance(api_key, str)
+    return OpenAI(base_url=base_url, api_key=api_key)
 
 
 def get_blob_service_client():
-    return BlobServiceClient.from_connection_string(
-        os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-    )
+    connection_string = _tool_str("tools.generate_image.storage.connection_string")
+    assert isinstance(connection_string, str)
+    return BlobServiceClient.from_connection_string(connection_string)
 
 
 @tool
@@ -103,14 +135,18 @@ def get_current_time() -> str:
 tool_generator.append(get_current_time)
 
 
-if os.getenv("AZURE_SESSIONPOOL_ENDPOINT"):
+if _tool_enabled("tools.azure_session_pool.enabled"):
+    session_pool_endpoint = _tool_str("tools.azure_session_pool.endpoint")
+    assert isinstance(session_pool_endpoint, str)
     code_tool = SessionsPythonREPLTool(
-        name="python", pool_management_endpoint=os.getenv("AZURE_SESSIONPOOL_ENDPOINT")
+        name="python",
+        pool_management_endpoint=session_pool_endpoint,
     )
     tool_generator.append(code_tool)
 
-if os.getenv("SEARXNG_URL"):
-    searxng_url = os.getenv("SEARXNG_URL")
+if _tool_enabled("tools.searxng.enabled"):
+    searxng_url = _tool_str("tools.searxng.base_url")
+    assert isinstance(searxng_url, str)
     print(f"🌐 Initializing SearxNG with URL: {searxng_url}")
 
     try:
@@ -175,18 +211,20 @@ if os.getenv("SEARXNG_URL"):
 
         print(traceback.format_exc())
 else:
-    print("  ⚠️ SEARXNG_URL not set, web_search tool will not be available")
+    print("  ⚠️ tools.searxng is disabled, web_search tool will not be available")
 
 # Azure AI Search tools
-if (
-    os.getenv("AZURE_SEARCH_ENDPOINT")
-    and os.getenv("AZURE_SEARCH_API_KEY")
-    and os.getenv("AZURE_SEARCH_INDEX_NAME")
-):
+if _tool_enabled("tools.ai_search.enabled"):
+    search_endpoint = _tool_str("tools.ai_search.endpoint")
+    search_index_name = _tool_str("tools.ai_search.index_name")
+    search_api_key = _tool_str("tools.ai_search.api_key")
+    assert isinstance(search_endpoint, str)
+    assert isinstance(search_index_name, str)
+    assert isinstance(search_api_key, str)
     search_client = SearchClient(
-        endpoint=os.getenv("AZURE_SEARCH_ENDPOINT"),
-        index_name=os.getenv("AZURE_SEARCH_INDEX_NAME"),
-        credential=AzureKeyCredential(os.getenv("AZURE_SEARCH_API_KEY")),
+        endpoint=search_endpoint,
+        index_name=search_index_name,
+        credential=AzureKeyCredential(search_api_key),
     )
 
     @tool(args_schema=AzureSearchInput)
@@ -203,9 +241,9 @@ if (
         try:
             top = min(max(1, top), 50)  # Ensure top is between 1 and 50
 
-            # Get semantic configuration from env or use default
-            semantic_config = os.getenv(
-                "AZURE_SEARCH_SEMANTIC_CONFIG", "main-semantic-config"
+            # Get semantic configuration from config or use default
+            semantic_config = _tool_value(
+                "tools.ai_search.semantic_config", "main-semantic-config"
             )
             print(
                 f"🔍 Semantic search: query='{query}', top={top}, config='{semantic_config}'"
@@ -357,14 +395,15 @@ if (
     tool_generator.append(azure_search_filter)
 
     # Vector search tool (requires vector embeddings)
-    if os.getenv("AZURE_OPENAI_ENDPOINT") and os.getenv("AZURE_OPENAI_API_KEY"):
+    if _tool_enabled("tools.ai_search.openai_embedding.enabled"):
         try:
-            from openai import AzureOpenAI
-
-            openai_client = AzureOpenAI(
-                api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-                api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01"),
-                azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+            embedding_base_url = _tool_str("tools.ai_search.openai_embedding.base_url")
+            embedding_api_key = _tool_str("tools.ai_search.openai_embedding.api_key")
+            assert isinstance(embedding_base_url, str)
+            assert isinstance(embedding_api_key, str)
+            openai_client = OpenAI(
+                base_url=embedding_base_url,
+                api_key=embedding_api_key,
             )
 
             @tool(args_schema=AzureSearchInput)
@@ -382,10 +421,10 @@ if (
                     top = min(max(1, top), 50)  # Ensure top is between 1 and 50
 
                     # Generate embedding for the query
-                    embedding_model = os.getenv(
-                        "AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME",
-                        "text-embedding-ada-002",
+                    embedding_model = _tool_str(
+                        "tools.ai_search.openai_embedding.model_id"
                     )
+                    assert isinstance(embedding_model, str)
                     print(
                         f"🔍 Vector search: query='{query}', top={top}, embedding_model='{embedding_model}'"
                     )
@@ -397,8 +436,9 @@ if (
                     print(f"  ✅ Generated embedding vector (dim={len(query_vector)})")
 
                     # Perform vector search
-                    vector_field = os.getenv(
-                        "AZURE_SEARCH_VECTOR_FIELD", "content_vector"
+                    vector_field = cast(
+                        str,
+                        _tool_value("tools.ai_search.vector_field", "content_vector"),
                     )
                     print(f"  🔍 Searching vector field: '{vector_field}'")
 
@@ -474,30 +514,18 @@ def _generate_image_flux(prompt: str, size: str) -> bytes:
     Returns:
         bytes: Generated image bytes
     """
-    # Get base endpoint and derive FLUX endpoint
-    openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-    api_key = os.getenv("AZURE_OPENAI_API_KEY")
-    deployment_name = os.getenv("AZURE_OPENAI_DALLE_DEPLOYMENT_NAME", "flux.2-pro")
-
-    if not openai_endpoint:
-        raise EnvironmentError("AZURE_OPENAI_ENDPOINT environment variable is not set")
-    if not api_key:
-        raise EnvironmentError(
-            "AZURE_OPENAI_API_KEY environment variable is not set for FLUX model"
-        )
-
-    # Transform endpoint from openai.azure.com to services.ai.azure.com
-    # e.g., https://foundry-poc-chatbot.openai.azure.com -> https://foundry-poc-chatbot.services.ai.azure.com
-    flux_endpoint = openai_endpoint.replace(
-        ".openai.azure.com", ".services.ai.azure.com"
+    flux_endpoint = _tool_str("tools.generate_image.flux.endpoint")
+    api_key = _tool_str("tools.generate_image.flux.api_key")
+    model_id = _tool_str("tools.generate_image.flux.model_id")
+    api_version = cast(
+        str, _tool_value("tools.generate_image.flux.api_version", "preview")
     )
+    assert isinstance(flux_endpoint, str)
+    assert isinstance(api_key, str)
+    assert isinstance(model_id, str)
+    assert isinstance(api_version, str)
 
-    # Transform flux endpoint model name to match FLUX naming convention
-    # e.g. "FLUX.2-PRO" -> "flux-2-pro"
-    endpoint_model_name = deployment_name.replace(".", "-").lower()
-
-    # Build the full URL with the model path
-    url = f"{flux_endpoint.rstrip('/')}/providers/blackforestlabs/v1/{endpoint_model_name}?api-version=preview"
+    url = f"{flux_endpoint.rstrip('/')}/{model_id}?api-version={api_version}"
 
     headers = {
         "Content-Type": "application/json",
@@ -508,7 +536,7 @@ def _generate_image_flux(prompt: str, size: str) -> bytes:
         "prompt": prompt,
         "size": size,
         "n": 1,
-        "model": deployment_name.lower(),
+        "model": model_id,
     }
 
     print(f"  🌐 Calling FLUX API: {url}")
@@ -516,8 +544,13 @@ def _generate_image_flux(prompt: str, size: str) -> bytes:
     response.raise_for_status()
 
     result = response.json()
-    b64_data = result["data"][0]["b64_json"]
-    return base64.b64decode(b64_data)
+    data = result.get("data")
+    if not isinstance(data, list) or not data:
+        raise ValueError("FLUX response did not include image data")
+    first_item = data[0]
+    if not isinstance(first_item, dict):
+        raise ValueError("FLUX response contained invalid image payload")
+    return _decode_base64_image(first_item.get("b64_json"), "FLUX response")
 
 
 def _generate_image_dalle(prompt: str, size: str, style: str) -> bytes:
@@ -532,20 +565,24 @@ def _generate_image_dalle(prompt: str, size: str, style: str) -> bytes:
         bytes: Generated image bytes
     """
     client = get_dalle_client()
-    deployment_name = os.getenv("AZURE_OPENAI_DALLE_DEPLOYMENT_NAME", "dall-e-3")
+    model_id = _tool_str("tools.generate_image.dalle.model_id")
+    assert isinstance(model_id, str)
 
     result = client.images.generate(
-        model=deployment_name,
+        model=model_id,
         prompt=prompt,
-        size=size,
+        size=cast(Any, size),
         quality="standard",
-        style=style,
+        style=cast(Any, style),
         n=1,
         response_format="b64_json",
     )
 
-    b64_data = result.data[0].b64_json
-    return base64.b64decode(b64_data)
+    if not result.data:
+        raise ValueError("DALL-E response did not include image data")
+    first_item = cast(Any, result.data[0])
+    b64_data = first_item.b64_json
+    return _decode_base64_image(b64_data, "DALL-E response")
 
 
 def _generate_image_gpt_image(prompt: str, size: str) -> bytes:
@@ -558,25 +595,18 @@ def _generate_image_gpt_image(prompt: str, size: str) -> bytes:
     Returns:
         bytes: Generated image bytes
     """
-    # Get base endpoint and derive GPT-Image endpoint
-    openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-    api_key = os.getenv("AZURE_OPENAI_API_KEY")
-
-    if not openai_endpoint:
-        raise EnvironmentError("AZURE_OPENAI_ENDPOINT environment variable is not set")
-    if not api_key:
-        raise EnvironmentError(
-            "AZURE_OPENAI_API_KEY environment variable is not set for GPT-Image model"
-        )
-
-    # Transform endpoint from openai.azure.com to cognitiveservices.azure.com
-    # e.g., https://foundry-poc-chatbot.openai.azure.com -> https://foundry-poc-chatbot.cognitiveservices.azure.com
-    gpt_image_endpoint = openai_endpoint.replace(
-        ".openai.azure.com", ".cognitiveservices.azure.com"
+    gpt_image_endpoint = _tool_str("tools.generate_image.gpt_image.endpoint")
+    api_key = _tool_str("tools.generate_image.gpt_image.api_key")
+    api_version = cast(
+        str, _tool_value("tools.generate_image.gpt_image.api_version", "2024-02-01")
     )
+    model_id = _tool_str("tools.generate_image.gpt_image.model_id")
+    assert isinstance(gpt_image_endpoint, str)
+    assert isinstance(api_key, str)
+    assert isinstance(api_version, str)
+    assert isinstance(model_id, str)
 
-    # Build the full URL with the gpt-image deployment path
-    url = f"{gpt_image_endpoint.rstrip('/')}/openai/deployments/gpt-image-1.5/images/generations?api-version=2024-02-01"
+    url = f"{gpt_image_endpoint.rstrip('/')}?api-version={api_version}"
 
     headers = {
         "Content-Type": "application/json",
@@ -589,6 +619,7 @@ def _generate_image_gpt_image(prompt: str, size: str) -> bytes:
         "quality": "medium",
         "output_compression": 100,
         "output_format": "png",
+        "model": model_id,
         "n": 1,
     }
 
@@ -597,19 +628,24 @@ def _generate_image_gpt_image(prompt: str, size: str) -> bytes:
     response.raise_for_status()
 
     result = response.json()
-    b64_data = result["data"][0]["b64_json"]
-    return base64.b64decode(b64_data)
+    data = result.get("data")
+    if not isinstance(data, list) or not data:
+        raise ValueError("GPT-Image response did not include image data")
+    first_item = data[0]
+    if not isinstance(first_item, dict):
+        raise ValueError("GPT-Image response contained invalid image payload")
+    return _decode_base64_image(first_item.get("b64_json"), "GPT-Image response")
 
 
 @tool
-def generate_image(prompt: str, size: str, style: str) -> str:
+def generate_image(
+    prompt: str,
+    size: ImageSize = "1024x1024",
+    style: ImageStyle = "vivid",
+) -> str:
     """Generate an image using DALL-E, FLUX, or GPT-Image model.
 
-    The model is automatically selected based on the AZURE_OPENAI_DALLE_DEPLOYMENT_NAME
-    environment variable:
-    - If it contains 'gpt-image', the GPT-Image model is used
-    - If it contains 'flux', the FLUX model is used
-    - Otherwise, DALL-E is used
+    The model is automatically selected based on tools.generate_image.provider.
 
     Args:
         prompt: Prompt for image generation
@@ -620,33 +656,35 @@ def generate_image(prompt: str, size: str, style: str) -> str:
         str: Generated image URL
     """
     try:
-        # Validate environment variables
-        storage_connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-        container_name = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
+        storage_connection_string = _tool_str(
+            "tools.generate_image.storage.connection_string"
+        )
+        container_name = _tool_str("tools.generate_image.storage.container_name")
+        provider = _tool_str("tools.generate_image.provider").lower()
+        assert isinstance(storage_connection_string, str)
+        assert isinstance(container_name, str)
+        assert isinstance(provider, str)
 
-        if not storage_connection_string:
-            raise EnvironmentError(
-                "AZURE_STORAGE_CONNECTION_STRING environment variable is not set"
-            )
-        if not container_name:
-            raise EnvironmentError(
-                "AZURE_STORAGE_CONTAINER_NAME environment variable is not set"
-            )
+        if provider not in {"dalle", "flux", "gpt_image"}:
+            raise EnvironmentError("Invalid tools.generate_image.provider value")
 
-        deployment_name = os.getenv("AZURE_OPENAI_DALLE_DEPLOYMENT_NAME", "dall-e-3")
-        is_gpt_image = "gpt-image" in deployment_name.lower()
-        is_flux = "flux" in deployment_name.lower()
-
-        model_name = "GPT-Image" if is_gpt_image else ("FLUX" if is_flux else "DALL-E")
+        model_name = (
+            "GPT-Image"
+            if provider == "gpt_image"
+            else ("FLUX" if provider == "flux" else "DALL-E")
+        )
         print(f"🔍 Image generation: prompt='{prompt}', model='{model_name}'")
 
         # Generate image based on model type
-        if is_gpt_image:
-            image_bytes = _generate_image_gpt_image(prompt, size)
-        elif is_flux:
-            image_bytes = _generate_image_flux(prompt, size)
+        image_size = cast(str, size)
+        image_style = cast(str, style)
+
+        if provider == "gpt_image":
+            image_bytes = _generate_image_gpt_image(prompt, image_size)
+        elif provider == "flux":
+            image_bytes = _generate_image_flux(prompt, image_size)
         else:
-            image_bytes = _generate_image_dalle(prompt, size, style)
+            image_bytes = _generate_image_dalle(prompt, image_size, image_style)
 
         print(f"  ✅ Image generated (size: {len(image_bytes)} bytes)")
 
@@ -686,7 +724,8 @@ def generate_image(prompt: str, size: str, style: str) -> str:
         return error_msg
 
 
-tool_generator.append(generate_image)
+if _tool_enabled("tools.generate_image.enabled"):
+    tool_generator.append(generate_image)
 
 print(f"✓ Tools loaded. Tools available: {[tool.name for tool in tool_generator]}")
 # List of available tools

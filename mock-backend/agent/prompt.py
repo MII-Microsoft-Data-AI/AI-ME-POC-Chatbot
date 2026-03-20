@@ -1,18 +1,11 @@
 import dotenv
+from typing import cast
+
 dotenv.load_dotenv()
-required_env = [
-   'PROMPTY_BASE_URL',
-   'PROMPTY_PROJECT_ID',
-   'PROMPTY_API_KEY',
-]
-
-import os
-
-missing_env = [var for var in required_env if not os.getenv(var)]
-if missing_env:
-   raise EnvironmentError(f"Missing required environment variables: {', '.join(missing_env)}")
 
 from prompty import PromptyClient
+
+from .config import get_agent_config, get_bool_config_value, get_required_config_value
 
 FALLBACK_SYSTEM_PROMPT = """
 You are MII Chat, a large language model based on the GPT-5.2 model developed by PT. Mitra Integrasi Informatika - Microsoft AI Division.
@@ -239,13 +232,28 @@ You must:
 """
 
 _prompty_client = None
+
+
 def get_prompty_client() -> PromptyClient:
-   """Initialize and return a PromptyClient instance."""
-   global _prompty_client
-   if _prompty_client is None:
-      _prompty_client = PromptyClient(
-         base_url=os.getenv('PROMPTY_BASE_URL'),
-         project_id=os.getenv('PROMPTY_PROJECT_ID'),
-         api_key=os.getenv('PROMPTY_API_KEY')  # Replace with your actual API key
-      )
-   return _prompty_client
+    """Initialize and return a PromptyClient instance."""
+    global _prompty_client
+    if _prompty_client is None:
+        config = get_agent_config()
+        if not get_bool_config_value(config, "prompty.enabled", False):
+            raise EnvironmentError("Prompty is disabled in AGENT_CONFIG_JSON_BASE64")
+
+        base_url: str = cast(str, get_required_config_value(config, "prompty.base_url"))
+        project_id: str = cast(
+            str, get_required_config_value(config, "prompty.project_id")
+        )
+        api_key: str = cast(str, get_required_config_value(config, "prompty.api_key"))
+
+        _prompty_client = cast(
+            PromptyClient,
+            PromptyClient(
+                base_url=base_url,
+                project_id=project_id,
+                api_key=api_key,
+            ),
+        )
+    return _prompty_client

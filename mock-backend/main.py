@@ -1,7 +1,6 @@
 """Main FastAPI server with LangGraph integration."""
 
 import sys
-import os
 
 sys.dont_write_bytecode = True
 
@@ -19,6 +18,11 @@ from typing import Annotated
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends
 from fastapi.concurrency import run_in_threadpool
+from lib.application_config import (
+    get_application_config,
+    get_int_application_config_value,
+    get_required_application_config_value,
+)
 
 # Utils and modules
 from lib.auth import get_authenticated_user
@@ -141,4 +145,9 @@ app.include_router(
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+    application_config = get_application_config()
+    uvicorn.run(
+        app,
+        host=get_required_application_config_value(application_config, "server.host"),
+        port=get_int_application_config_value(application_config, "server.port"),
+    )
